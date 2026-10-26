@@ -1,5 +1,7 @@
 # NetrekProtocol
 
+[![CI](https://github.com/lismondbernard/NetrekProtocol/actions/workflows/ci.yml/badge.svg)](https://github.com/lismondbernard/NetrekProtocol/actions/workflows/ci.yml)
+
 A Swift package for writing a [Netrek](https://www.netrek.org) client. It speaks the classic Netrek protocol: it connects to a game server over TCP, logs in, sends your commands, and keeps a model of the universe up to date as the server reports it. It can also ask the metaserver for the list of public servers and find servers on your local network.
 
 This is the protocol and networking code from [Parallax](https://silentspice.com/parallax/), a Netrek client for Mac, iPad and Apple TV, published on its own so anyone can build a client.
