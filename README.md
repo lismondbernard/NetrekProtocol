@@ -119,6 +119,16 @@ A few things to know:
 swift test
 ```
 
+## Open source plan
+
+Multiplayer in Parallax is free to play, always. We open the code in three steps.
+
+1. **Now:** this package, NetrekProtocol, the protocol and networking code. MIT license, keeping Darrell Root's copyright, because it grew from his Netrek-SwiftUI client.
+2. **When Parallax 1.0 ships:** the multiplayer client and the game engine, under MIT. The engine grew from Darrell Root's netrek-server-swift.
+3. **Three years after 1.0, or sooner if Parallax has been off the App Store for 12 months:** the missions, tutorial, robots and new ship art. Code is MIT, art is CC-BY.
+
+Part of what Parallax earns goes to the volunteers who run the public Netrek servers. We will post a yearly note of what came in and what went out.
+
 ## Credits
 
 This code began as Darrell Root's [Netrek-SwiftUI](https://github.com/darrellroot/Netrek-SwiftUI) client, and its protocol work also fed his [netrek-server-swift](https://github.com/darrellroot/netrek-server-swift). Thank you, Darrell. Silent Spice has since reworked it for Parallax and split it out as this package.
