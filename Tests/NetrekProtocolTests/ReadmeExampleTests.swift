@@ -9,6 +9,9 @@
 import XCTest
 import NetrekProtocol
 
+// TcpReader uses Network.framework, so the example only builds on Apple platforms.
+#if canImport(Network)
+
 // --- README example starts ---
 final class MinimalClient: NetworkDelegateExtended, PacketAnalyzerDelegate {
     let universe = Universe()
@@ -84,3 +87,5 @@ final class ReadmeExampleTests: XCTestCase {
         client.report()
     }
 }
+
+#endif

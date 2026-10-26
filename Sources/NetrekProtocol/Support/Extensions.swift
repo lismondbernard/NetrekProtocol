@@ -23,6 +23,6 @@ extension Data {
     }
 
     func to<T>(type: T.Type) -> T {
-        return self.withUnsafeBytes { $0.pointee }
+        return self.withUnsafeBytes { $0.loadUnaligned(as: T.self) }
     }
 }

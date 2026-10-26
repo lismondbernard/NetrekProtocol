@@ -1,5 +1,7 @@
 # NetrekProtocol
 
+[![CI](https://github.com/lismondbernard/NetrekProtocol/actions/workflows/ci.yml/badge.svg)](https://github.com/lismondbernard/NetrekProtocol/actions/workflows/ci.yml)
+
 A Swift package for writing a [Netrek](https://www.netrek.org) client. It speaks the classic Netrek protocol: it connects to a game server over TCP, logs in, sends your commands, and keeps a model of the universe up to date as the server reports it. It can also ask the metaserver for the list of public servers and find servers on your local network.
 
 This is the protocol and networking code from [Parallax](https://silentspice.com/parallax/), a Netrek client for Mac, iPad and Apple TV, published on its own so anyone can build a client.
@@ -15,7 +17,7 @@ This is the protocol and networking code from [Parallax](https://silentspice.com
 
 ## Platforms
 
-macOS 12, iOS 15 and tvOS 15 or later, Swift 5.9 or later. The code avoids SwiftUI and keeps Network.framework and Combine behind `canImport` checks so most of it can build elsewhere, but only Apple platforms are tested.
+macOS 12, iOS 15 and tvOS 15 or later, Swift 5.9 or later. The code avoids SwiftUI and keeps Network.framework and Combine behind `canImport` checks so the package also builds on Linux, where CI runs the tests too. On Linux there is no `TcpReader` or `LocalServerBrowser` (both use Network.framework), so bring your own TCP connection and feed what it receives to `PacketAnalyzer`.
 
 ## Adding it
 

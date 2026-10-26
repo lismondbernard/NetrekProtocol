@@ -38,13 +38,13 @@ final class PacketParsingTests: XCTestCase {
 
         // Extract position X (bytes 4-7, big endian)
         let posXNetrek = packet.subdata(in: 4..<8).withUnsafeBytes {
-            $0.load(as: Int32.self).byteSwapped
+            $0.loadUnaligned(as: Int32.self).byteSwapped
         }
         XCTAssertEqual(posXNetrek, 75000, "Position X should be 75000")
 
         // Extract position Y (bytes 8-11, big endian)
         let posYNetrek = packet.subdata(in: 8..<12).withUnsafeBytes {
-            $0.load(as: Int32.self).byteSwapped
+            $0.loadUnaligned(as: Int32.self).byteSwapped
         }
         XCTAssertEqual(posYNetrek, 25000, "Position Y should be 25000")
     }
@@ -54,10 +54,10 @@ final class PacketParsingTests: XCTestCase {
         let packet = PacketBuilder.spPlayer(playerId: 1, positionX: 50000, positionY: 50000)
 
         let posXNetrek = packet.subdata(in: 4..<8).withUnsafeBytes {
-            $0.load(as: Int32.self).byteSwapped
+            $0.loadUnaligned(as: Int32.self).byteSwapped
         }
         let posYNetrek = packet.subdata(in: 8..<12).withUnsafeBytes {
-            $0.load(as: Int32.self).byteSwapped
+            $0.loadUnaligned(as: Int32.self).byteSwapped
         }
 
         let gameX = NetrekMath.netrekX2GameX(Int(posXNetrek))
@@ -81,7 +81,7 @@ final class PacketParsingTests: XCTestCase {
         let packet = PacketBuilder.spYou(playerId: 5, flags: shieldFlag)
 
         let flags = packet.subdata(in: 8..<12).withUnsafeBytes {
-            $0.load(as: UInt32.self).byteSwapped
+            $0.loadUnaligned(as: UInt32.self).byteSwapped
         }
 
         XCTAssertEqual(flags, shieldFlag, "Flags should match")
@@ -92,7 +92,7 @@ final class PacketParsingTests: XCTestCase {
         let packet = PacketBuilder.spYou(playerId: 3, damage: 50)
 
         let damage = packet.subdata(in: 12..<16).withUnsafeBytes {
-            $0.load(as: UInt32.self).byteSwapped
+            $0.loadUnaligned(as: UInt32.self).byteSwapped
         }
 
         XCTAssertEqual(damage, 50, "Damage should be 50")
@@ -102,7 +102,7 @@ final class PacketParsingTests: XCTestCase {
         let packet = PacketBuilder.spYou(playerId: 2, fuel: 8000)
 
         let fuel = packet.subdata(in: 20..<24).withUnsafeBytes {
-            $0.load(as: UInt32.self).byteSwapped
+            $0.loadUnaligned(as: UInt32.self).byteSwapped
         }
 
         XCTAssertEqual(fuel, 8000, "Fuel should be 8000")
@@ -112,7 +112,7 @@ final class PacketParsingTests: XCTestCase {
         let packet = PacketBuilder.spYou(playerId: 1, shieldStrength: 75)
 
         let shields = packet.subdata(in: 16..<20).withUnsafeBytes {
-            $0.load(as: UInt32.self).byteSwapped
+            $0.loadUnaligned(as: UInt32.self).byteSwapped
         }
 
         XCTAssertEqual(shields, 75, "Shield strength should be 75")
@@ -124,7 +124,7 @@ final class PacketParsingTests: XCTestCase {
         let packet = PacketBuilder.spYou(playerId: 4, flags: flags)
 
         let extractedFlags = packet.subdata(in: 8..<12).withUnsafeBytes {
-            $0.load(as: UInt32.self).byteSwapped
+            $0.loadUnaligned(as: UInt32.self).byteSwapped
         }
 
         XCTAssertTrue(extractedFlags & 0x0001 != 0, "Shield flag should be set")
@@ -146,7 +146,7 @@ final class PacketParsingTests: XCTestCase {
         let packet = PacketBuilder.spFlags(playerId: 3, tractor: 0, flags: 0x0001)
 
         let flags = packet.subdata(in: 4..<8).withUnsafeBytes {
-            $0.load(as: UInt32.self).byteSwapped
+            $0.loadUnaligned(as: UInt32.self).byteSwapped
         }
 
         XCTAssertTrue(flags & 0x0001 != 0, "Shield flag should be set")
@@ -156,7 +156,7 @@ final class PacketParsingTests: XCTestCase {
         let packet = PacketBuilder.spFlags(playerId: 5, tractor: 0, flags: 0x0010)
 
         let flags = packet.subdata(in: 4..<8).withUnsafeBytes {
-            $0.load(as: UInt32.self).byteSwapped
+            $0.loadUnaligned(as: UInt32.self).byteSwapped
         }
 
         XCTAssertTrue(flags & 0x0010 != 0, "Cloak flag should be set")
@@ -182,7 +182,7 @@ final class PacketParsingTests: XCTestCase {
         let packet = PacketBuilder.spPlanet(planetId: 3, armies: 25)
 
         let armies = packet.subdata(in: 8..<12).withUnsafeBytes {
-            $0.load(as: UInt32.self).byteSwapped
+            $0.loadUnaligned(as: UInt32.self).byteSwapped
         }
 
         XCTAssertEqual(armies, 25, "Armies should be 25")
@@ -193,7 +193,7 @@ final class PacketParsingTests: XCTestCase {
         let packet = PacketBuilder.spPlanet(planetId: 7, flags: 0x010)
 
         let flags = packet.subdata(in: 4..<6).withUnsafeBytes {
-            $0.load(as: UInt16.self).byteSwapped
+            $0.loadUnaligned(as: UInt16.self).byteSwapped
         }
 
         XCTAssertEqual(flags, 0x010, "Flags should be 0x010 (repair)")
@@ -205,7 +205,7 @@ final class PacketParsingTests: XCTestCase {
         let packet = PacketBuilder.spPlanet(planetId: 2, flags: flags)
 
         let extractedFlags = packet.subdata(in: 4..<6).withUnsafeBytes {
-            $0.load(as: UInt16.self).byteSwapped
+            $0.loadUnaligned(as: UInt16.self).byteSwapped
         }
 
         XCTAssertTrue(extractedFlags & 0x010 != 0, "Repair flag should be set")
@@ -266,7 +266,7 @@ final class PacketParsingTests: XCTestCase {
         let packet = PacketBuilder.spTorpInfo(torpedoId: 123, war: 0x04, status: 2)
 
         let torpId = packet.subdata(in: 4..<6).withUnsafeBytes {
-            $0.load(as: UInt16.self).byteSwapped
+            $0.loadUnaligned(as: UInt16.self).byteSwapped
         }
 
         XCTAssertEqual(torpId, 123, "Torpedo ID should be 123")
