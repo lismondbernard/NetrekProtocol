@@ -141,6 +141,21 @@ struct PacketBuilder {
         return data
     }
 
+    /// SP_PL_LOGIN (Type 24) - A player's rank, name, host and login, 52 bytes
+    static func spPlLogin(playerId: UInt8, rank: UInt8 = 0, name: String,
+                          monitor: String = "", login: String) -> Data {
+        var data = Data(count: 52)
+        data[0] = 24          // packet type
+        data[1] = playerId
+        data[2] = rank
+        for (offset, text) in [(4, name), (20, monitor), (36, login)] {
+            for (index, byte) in text.utf8.prefix(15).enumerated() {
+                data[offset + index] = byte
+            }
+        }
+        return data
+    }
+
     /// SP_PSTATUS (Type 20) - Player slot status, 4 bytes
     static func spPstatus(playerId: UInt8, status: UInt8) -> Data {
         var data = Data(count: 4)
