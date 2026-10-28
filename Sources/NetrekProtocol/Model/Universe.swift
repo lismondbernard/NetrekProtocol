@@ -303,7 +303,7 @@ public class Universe: ObservableObject {
         }
         self.players[safe: playerId]?.update(war: war, hostile: hostile)
     }
-    public func updatePlayer(playerId: Int, rank: Int, name: String, login: String) {
+    public func updatePlayer(playerId: Int, rank: Int, name: String, login: String, monitor: String = "") {
         guard playerId >= 0 && playerId < maxPlayers else {
             debugPrint("Universe.updatePlayer invalid playerID \(playerId)")
             return
@@ -313,7 +313,7 @@ public class Universe: ObservableObject {
             newPlayer.universe = self
             self.players[playerId] = newPlayer
         }
-        self.players[safe: playerId]?.update(rank: rank, name: name, login: login)
+        self.players[safe: playerId]?.update(rank: rank, name: name, login: login, monitor: monitor)
 
     }
 

@@ -124,6 +124,13 @@ public class PacketAnalyzer {
             debugPrint(dumpString)
         }
     }
+    /// A fixed-size C string field: the bytes up to the first NUL, as UTF-8,
+    /// or Latin-1 when they aren't valid UTF-8 (older clients and servers).
+    static func cString(_ field: Data) -> String {
+        let bytes = field.prefix { $0 != 0 }
+        return String(data: bytes, encoding: .utf8) ?? String(data: bytes, encoding: .isoLatin1) ?? ""
+    }
+
     public func analyzeOnePacket(data: Data) {
         //debugPrint("in analyze one packet")
         guard !data.isEmpty else {
@@ -466,24 +473,13 @@ public class PacketAnalyzer {
             // new player logged in
             let playerID = Int(data[1])
             let rank = Int(data[2])
-            let nameData = data.subdata(in: (4..<20))
-            var name = "unknown"
-            if let nameStringWithNulls = String(data: nameData, encoding: .utf8) {
-                name = nameStringWithNulls.filter { $0 != "\0" }
-            }
-            let monitorData = data.subdata(in: (20..<36))
-            var monitor = "unknown"
-            if let monitorStringWithNulls = String(data: monitorData, encoding: .utf8) {
-                monitor = monitorStringWithNulls.filter { $0 != "\0" }
-                //debugPrint("SP_PL_LOGIN 24 monitor \(monitor)")
-            }
-            let loginData = data.subdata(in: (36..<52))
-            var login = "unknown"
-            if let loginStringWithNulls = String(data: loginData, encoding: .utf8) {
-                login = loginStringWithNulls.filter { $0 != "\0" }
-            }
-            //debugPrint("Received SP_PL_LOGIN 24 playerID: \(playerID) rank: \(rank) name: \(name) login: \(login)")
-            universe.updatePlayer(playerId: playerID, rank: rank, name: name, login: login)
+            // name, monitor (the player's host) and login are 16-byte C
+            // strings: each ends at its first NUL, and anything after it is
+            // left over from an older value.
+            let name = Self.cString(data.subdata(in: (4..<20)))
+            let monitor = Self.cString(data.subdata(in: (20..<36)))
+            let login = Self.cString(data.subdata(in: (36..<52)))
+            universe.updatePlayer(playerId: playerID, rank: rank, name: name, login: login, monitor: monitor)
         /*case 25:
             // is reserved, but I got one on pickled.netrek.org
             break*/

@@ -106,6 +106,9 @@ public class Player: CustomStringConvertible, ObservableObject {
     // from packet type 24
     public private(set) var rank: Rank = .ensign
     public private(set) var login = "unknown"
+    /// The host the player connects from, as the server reports it (an
+    /// address, a host name, or "" when the server sends none).
+    public private(set) var monitor = ""
     // from packet type 3
     public private(set) var kills = 0.0
     public private(set) var slotStatus: SlotStatus = .free {
@@ -185,6 +188,11 @@ public class Player: CustomStringConvertible, ObservableObject {
         debugPrint("player ID \(playerId) deinit")
     }
     public func reset() {
+        // Called when leaving a server: the next server sends its own.
+        name = "nobody"
+        login = "unknown"
+        monitor = ""
+        rank = .ensign
         /*if playerTacticalNode.parent != nil {
             playerTacticalNode.removeAllActions()
             playerTacticalNode.removeFromParent()
@@ -537,7 +545,7 @@ public class Player: CustomStringConvertible, ObservableObject {
         self.sbMaxKills = sbMaxKills
     }
 
-    public func update(rank: Int, name: String, login: String) {
+    public func update(rank: Int, name: String, login: String, monitor: String = "") {
         for netrekRank in Rank.allCases {
             if netrekRank.rawValue == rank {
                 self.rank = netrekRank
@@ -545,6 +553,7 @@ public class Player: CustomStringConvertible, ObservableObject {
         }
         self.name = name
         self.login = login
+        self.monitor = monitor
     }
 }
 
