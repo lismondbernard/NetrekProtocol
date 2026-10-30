@@ -73,8 +73,8 @@ struct CP_DIRECTION {
 struct CP_LASER {
     let type: UInt8 = 4
     var netrekDirection: UInt8 = 0
-    let pad1 = 0
-    let pad2 = 0
+    let pad1: UInt8 = 0
+    let pad2: UInt8 = 0
     
     var size: Int {
         return 4
