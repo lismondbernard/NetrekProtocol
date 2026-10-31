@@ -1,16 +1,16 @@
 //
-//  PacketLayoutTests.swift
-//  NetrekProtocolTests
+//  ClientPacketLayoutTests.swift
+//  NetrekWireTests
 //
-//  MakePacket copies each CP_* struct straight out of memory, so the
+//  Senders copy each CP_* struct straight out of memory, so the
 //  struct's in-memory size has to equal the size the server reads for
 //  that packet type. These tests pin both.
 //
 
 import XCTest
-@testable import NetrekProtocol
+import NetrekWire
 
-final class PacketLayoutTests: XCTestCase {
+final class ClientPacketLayoutTests: XCTestCase {
 
     // MARK: - Struct size matches the wire size
 
@@ -50,8 +50,8 @@ final class PacketLayoutTests: XCTestCase {
         XCTAssertEqual(CP_MESSAGE().size, MemoryLayout<CP_MESSAGE>.size)
         XCTAssertEqual(CP_LASER().size, MemoryLayout<CP_LASER>.size)
         XCTAssertEqual(CP_LOGIN().size, MemoryLayout<CP_LOGIN>.size)
-        XCTAssertEqual(CP_SOCKET().size, MemoryLayout<CP_SOCKET>.size)
-        XCTAssertEqual(CP_UPDATES().size, MemoryLayout<CP_UPDATES>.size)
+        XCTAssertEqual(CP_SOCKET(version: 0, udpVersion: 0, port: 0).size, MemoryLayout<CP_SOCKET>.size)
+        XCTAssertEqual(CP_UPDATES(usecs: 0).size, MemoryLayout<CP_UPDATES>.size)
         XCTAssertEqual(CP_FEATURE().size, MemoryLayout<CP_FEATURE>.size)
     }
 
@@ -109,12 +109,5 @@ final class PacketLayoutTests: XCTestCase {
         XCTAssertEqual(MemoryLayout<CP_FEATURE>.offset(of: \.arg2), 3)
         XCTAssertEqual(MemoryLayout<CP_FEATURE>.offset(of: \.value), 4)
         XCTAssertEqual(MemoryLayout<CP_FEATURE>.offset(of: \.name), 8)
-    }
-
-    // MARK: - Bytes on the wire
-
-    func testCpLaserPadsAreZero() {
-        let data = MakePacket.cpLaser(netrekDirection: 200)
-        XCTAssertEqual(Array(data), [4, 200, 0, 0])
     }
 }

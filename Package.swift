@@ -11,9 +11,12 @@ let package = Package(
     ],
     products: [
         .library(name: "NetrekProtocol", targets: ["NetrekProtocol"]),
+        .library(name: "NetrekWire", targets: ["NetrekWire"]),
     ],
     targets: [
-        .target(name: "NetrekProtocol"),
+        .target(name: "NetrekWire"),
+        .target(name: "NetrekProtocol", dependencies: ["NetrekWire"]),
+        .testTarget(name: "NetrekWireTests", dependencies: ["NetrekWire"]),
         .testTarget(name: "NetrekProtocolTests", dependencies: ["NetrekProtocol"]),
     ]
 )

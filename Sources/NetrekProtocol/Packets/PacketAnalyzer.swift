@@ -29,9 +29,9 @@ public class PacketAnalyzer {
     public let universe: Universe
     var leftOverData: Data?
 
-    let msg_len = 80
+    let msg_len = MSG_LEN
     let name_len = 16
-    let keymap_len = 96
+    let keymap_len = KEYMAP_LEN
     let playerMax = 100 // we ignore player updates for more than this
 
     /// Applied to every message and planet name the server sends. The
