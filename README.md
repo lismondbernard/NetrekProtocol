@@ -2,18 +2,39 @@
 
 [![CI](https://github.com/lismondbernard/NetrekProtocol/actions/workflows/ci.yml/badge.svg)](https://github.com/lismondbernard/NetrekProtocol/actions/workflows/ci.yml)
 
-A Swift package for writing a [Netrek](https://www.netrek.org) client. It speaks the classic Netrek protocol: it connects to a game server over TCP, logs in, sends your commands, and keeps a model of the universe up to date as the server reports it. It can also ask the metaserver for the list of public servers and find servers on your local network.
+A Swift package for the classic [Netrek](https://www.netrek.org) protocol. It has two products:
 
-This is the protocol and networking code from [Parallax](https://silentspice.com/parallax/), a Netrek client for Mac, iPad and Apple TV, published on its own so anyone can build a client.
+- **NetrekWire** is the wire format, for clients and servers alike: the packets in both directions as Swift structs laid out byte for byte as it goes on the wire, the packet type numbers, the packet sizes and the protocol constants. It has no game model, no networking and no dependencies.
+- **NetrekProtocol** is for writing a client. It connects to a game server over TCP, logs in, sends your commands, and keeps a model of the universe up to date as the server reports it. It can also ask the metaserver for the list of public servers and find servers on your local network. It uses NetrekWire for its packets.
 
-## What is in it
+This is the protocol and networking code from [Parallax](https://silentspice.com/parallax/), a Netrek client for Mac, iPad and Apple TV, published on its own so anyone can build a client or a server.
+
+## What is in NetrekWire
+
+- **Client to server:** structs for 29 `CP_*` packets (`CP_LOGIN`, `CP_OUTFIT`, `CP_SPEED`, `CP_TORP`, `CP_MESSAGE`, `CP_FEATURE` and the rest), and `ClientPacketType` and `CLIENT_PACKET_SIZES` (sizes keyed by packet type).
+- **Server to client:** structs for 23 `SP_*` packets (`SP_YOU`, `SP_PLAYER`, `SP_PLANET`, `SP_TORP`, `SP_LOGIN`, `SP_SHIP_CAP` and the rest), and `ServerPacketType` and `SERVER_PACKET_SIZES` (sizes indexed by packet type).
+- **Constants:** `NAME_LEN`, `KEYMAP_LEN`, `MSG_LEN`, `SOCKVERSION` and `UDPVERSION`.
+
+Each struct has public fields and a memberwise initialiser, nothing more. Multi-byte fields hold network byte order, so fill them with `.bigEndian` values. To send a packet, copy the struct's bytes:
+
+```swift
+import Foundation
+import NetrekWire
+
+var packet = CP_SPEED(speed: 4)
+let data = Data(bytes: &packet, count: packet.size)
+```
+
+Tests pin every struct's size and field offsets to the classic `packets.h`, and check them against the size tables.
+
+## What is in NetrekProtocol
 
 - **Connection:** `TcpReader` (a TCP connection built on Network.framework) and the `NetworkDelegate` protocols.
 - **Sending:** `MakePacket` builds every client packet: login, outfit, speed, direction, torpedo, laser, plasma, shields, cloak, tractor, pressor, orbit, bomb, beam, messages and the rest.
 - **Receiving:** `PacketAnalyzer` reads the server's packet stream and updates a `Universe`. Its `PacketAnalyzerDelegate` hears about login, outfit and team eligibility.
 - **The universe:** `Universe` holds `Player`, `Planet`, `Torpedo`, `Laser`, `Plasma` and `ShipInfo` objects plus the message log. They are `ObservableObject`s, so SwiftUI views can watch them. `UniverseEventDelegate` tells you when your ship is destroyed, when the server is ready for a new ship, and when weapons fire near you (Parallax uses it for sound).
 - **Servers:** `MetaServer` and `MetaServerEntry` list the public servers from metaserver.netrek.org, and `LocalServerBrowser` finds `_netrek._tcp` servers over Bonjour.
-- **Basics:** `Team`, `ShipType`, `Rank`, `SlotStatus`, `PlayerStatus`, `AlertCondition`, `GameState`, `PacketType`, `PACKET_SIZES` and `NetrekMath` (coordinate and direction conversions).
+- **Basics:** `Team`, `ShipType`, `Rank`, `SlotStatus`, `PlayerStatus`, `AlertCondition`, `GameState`, `PacketType`, `PACKET_SIZES` and `NetrekMath` (coordinate and direction conversions). `PacketType` and `PACKET_SIZES` are NetrekWire's `ServerPacketType` and `SERVER_PACKET_SIZES` under their old names.
 
 ## Platforms
 
@@ -28,6 +49,14 @@ dependencies: [
 targets: [
     .target(name: "MyClient", dependencies: ["NetrekProtocol"]),
 ]
+```
+
+A server, or anything else that only needs the packets, can depend on NetrekWire alone:
+
+```swift
+    .target(name: "MyServer", dependencies: [
+        .product(name: "NetrekWire", package: "NetrekProtocol"),
+    ]),
 ```
 
 ## A minimal client
