@@ -108,6 +108,12 @@ final class PacketSizeTableTests: XCTestCase {
         }
     }
 
+    func testCpPlanetSize() {
+        // Classic packets.h:886, struct planet_cpacket: char type, pnum,
+        // owner, info; short flags; int armies. That is 12 bytes.
+        XCTAssertEqual(CLIENT_PACKET_SIZES[Int(ClientPacketType.planet.rawValue)], 12)
+    }
+
     func testClientPacketTypesMatchSizeTable() {
         XCTAssertEqual(Set(ClientPacketType.allCases.map { Int($0.rawValue) }), Set(CLIENT_PACKET_SIZES.keys))
     }
