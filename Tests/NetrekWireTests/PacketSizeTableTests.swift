@@ -82,9 +82,28 @@ final class PacketSizeTableTests: XCTestCase {
 
     func testEveryServerPacketTypeHasATableEntry() {
         XCTAssertEqual(SERVER_PACKET_SIZES.count, 62)
-        for raw in UInt8.min...UInt8.max {
-            if let type = ServerPacketType(rawValue: raw) {
-                XCTAssertLessThan(Int(type.rawValue), SERVER_PACKET_SIZES.count, "\(type)")
+        // Types whose size is 0 on purpose today. A 0 makes PacketAnalyzer
+        // stop reading the buffer instead of guessing a length.
+        let zeroOnPurpose: Set<ServerPacketType> = [
+            // Type 0 is not a packet; a 0 byte here means the stream is lost.
+            .null,
+            // SP_SCAN is the ATM scanner reply. The classic server's reply
+            // code is commented out (ntserv/socket.c handleScan), and COW
+            // also gives it size 0 unless built with HANDLE_SCAN.
+            .scan,
+            // SP_S_SEQUENCE is the short-packets sequence. COW gives it size
+            // 0 too ("not yet implemented"), and this package never asks
+            // for short packets.
+            .sSequence,
+        ]
+        for type in ServerPacketType.allCases {
+            XCTAssertLessThan(Int(type.rawValue), SERVER_PACKET_SIZES.count, "\(type)")
+            guard Int(type.rawValue) < SERVER_PACKET_SIZES.count else { continue }
+            let size = SERVER_PACKET_SIZES[Int(type.rawValue)]
+            if zeroOnPurpose.contains(type) {
+                XCTAssertEqual(size, 0, "\(type) has a size now; take it off the list")
+            } else {
+                XCTAssertNotEqual(size, 0, "\(type) has no size")
             }
         }
     }

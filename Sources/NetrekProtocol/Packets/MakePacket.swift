@@ -30,7 +30,7 @@ public enum MakePacket {
     
     // CP_MESSAGE 1
     public static func cpMessage(message: String, team: Team?, individual: UInt8) -> Data {
-        let message_length = 80
+        let message_length = MSG_LEN
         var packet = CP_MESSAGE()
         //packet.type = 1
         if let team = team {

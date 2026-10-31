@@ -41,3 +41,10 @@ extension CP_UPDATES {
         self.init(usecs: UInt32(1000000 / UPDATE_RATE).bigEndian)
     }
 }
+
+extension CP_SOCKET {
+    /// The client's socket and UDP versions and its port.
+    init() {
+        self.init(version: SOCKVERSION, udpVersion: UDPVERSION, port: SOCKET_PORT.bigEndian)
+    }
+}

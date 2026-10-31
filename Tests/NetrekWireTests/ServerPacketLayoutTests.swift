@@ -44,12 +44,12 @@ final class ServerPacketLayoutTests: XCTestCase {
     }
 
     func testDeclaredSizesMatchStructSizes() {
-        XCTAssertEqual(SP_MESSAGE(flags: 0, from: 0).size, MemoryLayout<SP_MESSAGE>.size)
+        XCTAssertEqual(SP_MESSAGE().size, MemoryLayout<SP_MESSAGE>.size)
         XCTAssertEqual(SP_MOTD().size, MemoryLayout<SP_MOTD>.size)
-        XCTAssertEqual(SP_LOGIN(accept: 1).size, MemoryLayout<SP_LOGIN>.size)
-        XCTAssertEqual(SP_PICKOK(state: 1).size, MemoryLayout<SP_PICKOK>.size)
-        XCTAssertEqual(SP_LASER(laserID: 0, status: 0, direction: 0, positionX: 0, positionY: 0, target: 0).size, MemoryLayout<SP_LASER>.size)
-        XCTAssertEqual(SP_SHIP_CAP(shipType: 0, torpSpeed: 0, phaserRange: 0, maxSpeed: 0, maxFuel: 0, maxShield: 0, maxDamage: 0, maxWeaponTemp: 0, maxEngineTemp: 0, width: 0, height: 0, maxArmies: 0, letter: 0, designation1: 0, designation2: 0, bitmap: 0).size, MemoryLayout<SP_SHIP_CAP>.size)
+        XCTAssertEqual(SP_LOGIN().size, MemoryLayout<SP_LOGIN>.size)
+        XCTAssertEqual(SP_PICKOK().size, MemoryLayout<SP_PICKOK>.size)
+        XCTAssertEqual(SP_LASER().size, MemoryLayout<SP_LASER>.size)
+        XCTAssertEqual(SP_SHIP_CAP().size, MemoryLayout<SP_SHIP_CAP>.size)
     }
 
     // MARK: - Field offsets
@@ -159,7 +159,7 @@ final class ServerPacketLayoutTests: XCTestCase {
         XCTAssertEqual(offset(\SP_LOGIN.paradise2), 3)
         XCTAssertEqual(offset(\SP_LOGIN.flags), 4)
         XCTAssertEqual(offset(\SP_LOGIN.keymap), 8)
-        XCTAssertEqual(MemoryLayout.size(ofValue: SP_LOGIN(accept: 1).keymap), 96)
+        XCTAssertEqual(MemoryLayout.size(ofValue: SP_LOGIN().keymap), 96)
     }
 
     func testSpFlagsOffsets() {

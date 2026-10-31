@@ -62,7 +62,7 @@ public struct CP_MESSAGE {
     }
 
     public var size: Int {
-        return 84
+        return 4 + MSG_LEN
     }
 }
 
@@ -433,13 +433,19 @@ public struct CP_COUP {
 }
 public struct CP_SOCKET {
     public let type: UInt8 = 27
-    public let version: UInt8 = SOCKVERSION
-    public let udp_version: UInt8 = UDPVERSION
+    public let version: UInt8
+    public let udp_version: UInt8
     public let pad: UInt8 = 0
     //TODO: presumably we have to do something with this port
-    public let port: UInt32 = UInt32(32800).bigEndian
+    /// The client's port, in network byte order.
+    public let port: UInt32
 
-    public init() {}
+    /// `port` must already be in network byte order.
+    public init(version: UInt8, udpVersion: UInt8, port: UInt32) {
+        self.version = version
+        self.udp_version = udpVersion
+        self.port = port
+    }
 
     public var size: Int {
         return 8

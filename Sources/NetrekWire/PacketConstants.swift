@@ -3,9 +3,9 @@
 //  NetrekWire
 //
 //  Wire constants, packet type numbers and packet sizes for both
-//  directions. SERVER_PACKET_SIZES and the version numbers come from
-//  Darrell Root's Globals.swift (2019) in his Netrek-SwiftUI client;
-//  CLIENT_PACKET_SIZES comes from his netrek-server-swift (2020).
+//  directions. SERVER_PACKET_SIZES comes from Darrell Root's Globals.swift
+//  (2019) in his Netrek-SwiftUI client; CLIENT_PACKET_SIZES comes from his
+//  netrek-server-swift (2020).
 //
 
 /// Length of a name, password or login field (NAME_LEN in classic defs.h).
@@ -18,14 +18,8 @@ public let KEYMAP_LEN = 96
 /// (MSG_LEN in classic defs.h).
 public let MSG_LEN = 80
 
-/// Socket protocol version the client sends in CP_SOCKET.
-public let SOCKVERSION: UInt8 = 4
-
-/// UDP protocol version the client sends in CP_SOCKET.
-public let UDPVERSION: UInt8 = 10
-
 /// Netrek server-to-client packet type identifiers
-public enum ServerPacketType: UInt8 {
+public enum ServerPacketType: UInt8, CaseIterable {
     case null = 0
     case message = 1           // SP_MESSAGE
     case playerInfo = 2        // SP_PLAYER_INFO

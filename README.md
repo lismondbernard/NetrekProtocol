@@ -13,9 +13,9 @@ This is the protocol and networking code from [Parallax](https://silentspice.com
 
 - **Client to server:** structs for 29 `CP_*` packets (`CP_LOGIN`, `CP_OUTFIT`, `CP_SPEED`, `CP_TORP`, `CP_MESSAGE`, `CP_FEATURE` and the rest), and `ClientPacketType` and `CLIENT_PACKET_SIZES` (sizes keyed by packet type).
 - **Server to client:** structs for 23 `SP_*` packets (`SP_YOU`, `SP_PLAYER`, `SP_PLANET`, `SP_TORP`, `SP_LOGIN`, `SP_SHIP_CAP` and the rest), and `ServerPacketType` and `SERVER_PACKET_SIZES` (sizes indexed by packet type).
-- **Constants:** `NAME_LEN`, `KEYMAP_LEN`, `MSG_LEN`, `SOCKVERSION` and `UDPVERSION`.
+- **Constants:** `NAME_LEN`, `KEYMAP_LEN` and `MSG_LEN`.
 
-Each struct has public fields and a memberwise initialiser, nothing more. Multi-byte fields hold network byte order, so fill them with `.bigEndian` values. To send a packet, copy the struct's bytes:
+Each struct has public fields and initialisers, nothing more. The type byte is fixed. Each `SP_*` struct has an `init()` that zeroes every other field, so you set the fields you need. Multi-byte fields hold network byte order, so fill them with `.bigEndian` values. To send a packet, copy the struct's bytes:
 
 ```swift
 import Foundation
@@ -34,6 +34,7 @@ Tests pin every struct's size and field offsets to the classic `packets.h`, and 
 - **Receiving:** `PacketAnalyzer` reads the server's packet stream and updates a `Universe`. Its `PacketAnalyzerDelegate` hears about login, outfit and team eligibility.
 - **The universe:** `Universe` holds `Player`, `Planet`, `Torpedo`, `Laser`, `Plasma` and `ShipInfo` objects plus the message log. They are `ObservableObject`s, so SwiftUI views can watch them. `UniverseEventDelegate` tells you when your ship is destroyed, when the server is ready for a new ship, and when weapons fire near you (Parallax uses it for sound).
 - **Servers:** `MetaServer` and `MetaServerEntry` list the public servers from metaserver.netrek.org, and `LocalServerBrowser` finds `_netrek._tcp` servers over Bonjour.
+- **Re-exported:** importing NetrekProtocol also imports NetrekWire.
 - **Basics:** `Team`, `ShipType`, `Rank`, `SlotStatus`, `PlayerStatus`, `AlertCondition`, `GameState`, `PacketType`, `PACKET_SIZES` and `NetrekMath` (coordinate and direction conversions). `PacketType` and `PACKET_SIZES` are NetrekWire's `ServerPacketType` and `SERVER_PACKET_SIZES` under their old names.
 
 ## Platforms

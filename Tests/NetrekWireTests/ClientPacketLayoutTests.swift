@@ -50,7 +50,7 @@ final class ClientPacketLayoutTests: XCTestCase {
         XCTAssertEqual(CP_MESSAGE().size, MemoryLayout<CP_MESSAGE>.size)
         XCTAssertEqual(CP_LASER().size, MemoryLayout<CP_LASER>.size)
         XCTAssertEqual(CP_LOGIN().size, MemoryLayout<CP_LOGIN>.size)
-        XCTAssertEqual(CP_SOCKET().size, MemoryLayout<CP_SOCKET>.size)
+        XCTAssertEqual(CP_SOCKET(version: 0, udpVersion: 0, port: 0).size, MemoryLayout<CP_SOCKET>.size)
         XCTAssertEqual(CP_UPDATES(usecs: 0).size, MemoryLayout<CP_UPDATES>.size)
         XCTAssertEqual(CP_FEATURE().size, MemoryLayout<CP_FEATURE>.size)
     }
