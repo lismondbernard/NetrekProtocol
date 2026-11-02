@@ -1,0 +1,72 @@
+#!/bin/sh
+#
+# make-goldens.sh
+#
+# Rebuilds Tests/NetrekWireTests/CowDistressGoldens.swift from the COW
+# client's own RCD code. Needs git and a C compiler (tested with gcc on
+# Ubuntu 24.04). Run it from anywhere:
+#
+#   sh Tests/RCDHarness/make-goldens.sh
+#
+# It clones https://github.com/quozl/netrek-client-cow at COW_COMMIT into a
+# temporary directory (or uses COW_DIR if you set it), copies the four
+# tables the code needs out of COW's data.c, compiles harness.c together
+# with COW's distress.c and senddist.c, and writes the Swift file. Nothing
+# from COW is kept in this repository.
+
+set -eu
+
+COW_URL=https://github.com/quozl/netrek-client-cow
+COW_COMMIT=f680bd3a1a2b040e8af1a27ec921c059c04f8007
+
+here=$(cd "$(dirname "$0")" && pwd)
+repo=$(cd "$here/../.." && pwd)
+out="$repo/Tests/NetrekWireTests/CowDistressGoldens.swift"
+work=$(mktemp -d)
+trap 'rm -rf "$work"' EXIT
+
+if [ -n "${COW_DIR:-}" ]; then
+    cow=$COW_DIR
+else
+    cow="$work/cow"
+    git clone --quiet "$COW_URL" "$cow"
+    git -C "$cow" checkout --quiet "$COW_COMMIT"
+fi
+
+# The default RCD macros and the name tables, exactly as COW has them.
+{
+    sed -n '/^struct dmacro_list dist_defaults\[\] =/,/^};/p' "$cow/data.c"
+    sed -n '/^char   \*classes\[\] =/,/;/p' "$cow/data.c"
+    sed -n '/^char    teamlet\[\] =/,/;/p' "$cow/data.c"
+    sed -n '/^char   \*teamshort\[16\] =/,/;/p' "$cow/data.c"
+} > "$work/cowdata.inc"
+
+grep -q 'dist_defaults' "$work/cowdata.inc"
+grep -q 'teamshort' "$work/cowdata.inc"
+
+${CC:-cc} -std=gnu99 -w -I"$here" -I"$work" -I"$cow" \
+    -o "$work/rcd-goldens" "$here/harness.c"
+
+{
+    cat <<'EOF'
+//
+//  CowDistressGoldens.swift
+//  NetrekWireTests
+//
+//  Golden RCD data made by the COW client's own code, at
+//  https://github.com/quozl/netrek-client-cow commit
+//  f680bd3a1a2b040e8af1a27ec921c059c04f8007, through
+//  Tests/RCDHarness/make-goldens.sh. See that script and harness.c for how.
+//
+//  "message" is the 80 byte CP_MESSAGE body COW sends, without its trailing
+//  zero bytes. "relayed" is the SP_MESSAGE body the vanilla server sends on
+//  to RC_DISTRESS clients. "expanded" is the line COW shows for it with its
+//  default macros. "plainText" is what COW sends instead, as an ordinary
+//  team message (group "plainGroup"), when the server lacks RC_DISTRESS.
+//
+
+EOF
+    "$work/rcd-goldens"
+} > "$out"
+
+echo "wrote $out"
