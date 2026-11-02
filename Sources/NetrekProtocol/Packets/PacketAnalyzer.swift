@@ -39,6 +39,34 @@ public class PacketAnalyzer {
     /// (Rome, Kazari, Prague, laser); pass `{ $0 }` to keep the classic ones.
     public var textFilter: (String) -> String
 
+    /// What to do with an RCD distress call (an SP_MESSAGE with flags
+    /// MTEAM | MDISTR | MVALID and a valid binary body). Every SP_MESSAGE,
+    /// distress or not, also goes to `Universe.eventDelegate` through
+    /// `universe(_:receivedMessage:)`, and a distress call through
+    /// `universe(_:receivedDistress:message:)`.
+    ///
+    /// `false` (the default) keeps the message list as before: the call's
+    /// bytes go through the same ASCII decoding as chat, which gives
+    /// unreadable text where the platform accepts bytes over 0x7f, and
+    /// nothing at all where it does not (Linux).
+    /// `true` puts the call's default text in `Universe.gotMessage`
+    /// instead, the line a classic client shows, through `textFilter`.
+    public var expandsDistressCalls = false
+
+    /// The value the server sent with each feature name in SP_FEATURE,
+    /// -1 meaning the server does not know the feature. `delegate.serverFeatures`
+    /// keeps the names only.
+    public private(set) var serverFeatureValues: [String: Int] = [:]
+
+    /// Whether the server answered RC_DISTRESS with a positive value, so it
+    /// relays binary RCD calls. COW sends a call in binary only then
+    /// (COW feature.c:82, senddist.c:104); otherwise it sends the call's
+    /// text as an ordinary team message (`Distress.plainText`). Send
+    /// `MakePacket.cpFeatures(feature: "RC_DISTRESS")` to ask.
+    public var serverOffersRCDistress: Bool {
+        return (serverFeatureValues["RC_DISTRESS"] ?? 0) > 0
+    }
+
     public init(delegate: PacketAnalyzerDelegate, universe: Universe = .universe,
                 textFilter: @escaping (String) -> String = NetrekMath.sanitizeString) {
         self.delegate = delegate
@@ -162,6 +190,14 @@ public class PacketAnalyzer {
             let m_from = Int(data[3])
             let range = (4..<(4 + msg_len))
             let messageData = data.subdata(in: range)
+            let received = ReceivedMessage(flags: UInt8(flags), recipient: m_recpt, sender: m_from,
+                                           body: [UInt8](messageData))
+            let distress = received.distress
+            if expandsDistressCalls && distress != nil {
+                // Shown as its default text instead of its bytes.
+                universe.received(received, distress: distress, distressFilter: textFilter)
+                break
+            }
             var messageString = "message_decode_error"
 //            if let messageStringWithNulls = String(data: messageData, encoding: .utf8) {
             if let messageStringWithNulls = String(data: messageData, encoding: .ascii) {
@@ -183,6 +219,7 @@ public class PacketAnalyzer {
             }
             messageString = textFilter(messageString)
             //debugPrint("Received SP_MESSAGE 1 from \(m_from) message \(messageString)")
+            universe.received(received, distress: distress, distressFilter: nil)
 
         case 2:
             //SP_PLAYER_INFO
@@ -583,6 +620,10 @@ public class PacketAnalyzer {
                 }
             } else {
                 //debugPrint("Received SP_FEATURE 60 empty")
+            }
+            let signedValue = Int(Int32(bitPattern: data.subdata(in: (4..<8)).to(type: UInt32.self).byteSwapped))
+            for feature in features {
+                serverFeatureValues[feature] = signedValue
             }
             if let existingFeatures = delegate?.serverFeatures {
                 delegate?.serverFeatures = existingFeatures + features

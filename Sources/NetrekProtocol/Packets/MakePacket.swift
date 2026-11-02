@@ -36,17 +36,17 @@ public enum MakePacket {
         if let team = team {
             switch team {
             case .independent: // we'll assume this means all teams
-                packet.group = 8 // MALL
+                packet.group = MessageFlag.all
                 packet.indiv = 0
             case .federation, .roman, .kazari, .orion:
-                packet.group = 4 //MTEAM
+                packet.group = MessageFlag.team
                 packet.indiv = UInt8(team.rawValue)
             case .ogg:  // meaning all teams
-                packet.group = 8 // MALL
+                packet.group = MessageFlag.all
                 packet.indiv = 0
             }
         } else {  // team == nil so this is going to an individual
-            packet.group = 2 // MINDIV
+            packet.group = MessageFlag.individual
             packet.indiv = UInt8(individual)
         }
         //packet.pad1 = 0
@@ -70,6 +70,18 @@ public enum MakePacket {
         let data = Data(bytes: &packet, count: message_length + 4)
         debugPrint("Sending CP_MESSAGE 1 team: \(String(describing: team)) individual: \(individual) message \(message)")
         return data
+    }
+
+    /// CP_MESSAGE 1 carrying an RCD distress call to `team`, the sender's
+    /// own team, the way COW sends it when the server offers RC_DISTRESS
+    /// (COW senddist.c:99-108): group MTEAM | MDISTR, `indiv` the team bit,
+    /// and `distress.encode()` as the 80 message bytes. Every receiving
+    /// client shows it with its own texts; the vanilla server expands it
+    /// with the default texts for clients that did not ask for RC_DISTRESS
+    /// (ntserv/genspkt.c:1016-1030).
+    public static func cpDistress(_ distress: Distress, team: Team) -> Data {
+        debugPrint("Sending CP_MESSAGE 1 distress \(distress.type) team: \(team)")
+        return Data(distress.clientPacket(team: UInt8(team.rawValue)))
     }
 
     // CP_SPEED 2

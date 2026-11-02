@@ -174,6 +174,12 @@ public class Universe: ObservableObject {
     }
     public func gotMessage(_ newMessage: String) {
         DispatchQueue.main.async {
+            self.appendMessage(newMessage)
+        }
+    }
+    /// The body of `gotMessage(_:)`, for callers already on the main queue.
+    func appendMessage(_ newMessage: String) {
+        do {
             self.messages.append(newMessage)
             self.recentMessages.append(newMessage)
             if self.recentMessages.count > 15 {
