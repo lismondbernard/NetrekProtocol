@@ -32,6 +32,17 @@ public protocol UniverseEventDelegate: AnyObject {
     /// A laser (phaser) was fired within half of `NetrekMath.displayDistance`
     /// of me.
     func universe(_ universe: Universe, laserFired laser: Laser, distance: Int)
+
+    /// Any SP_MESSAGE arrived, with its raw flags, sender and bytes. Called
+    /// on the main queue, after the message's text (if any) has gone to
+    /// `Universe.gotMessage`.
+    func universe(_ universe: Universe, receivedMessage message: ReceivedMessage)
+
+    /// An SP_MESSAGE was an RCD distress call (MTEAM | MDISTR | MVALID with
+    /// a valid binary body). Called on the main queue, right after
+    /// `universe(_:receivedMessage:)` for the same message. Use
+    /// `Universe.defaultText(for:)` for the line a classic client shows.
+    func universe(_ universe: Universe, receivedDistress distress: Distress, message: ReceivedMessage)
 }
 
 public extension UniverseEventDelegate {
@@ -41,4 +52,6 @@ public extension UniverseEventDelegate {
     func universe(_ universe: Universe, torpedoNearby torpedo: Torpedo, distance: Int) {}
     func universe(_ universe: Universe, plasmaNearby plasma: Plasma, distance: Int) {}
     func universe(_ universe: Universe, laserFired laser: Laser, distance: Int) {}
+    func universe(_ universe: Universe, receivedMessage message: ReceivedMessage) {}
+    func universe(_ universe: Universe, receivedDistress distress: Distress, message: ReceivedMessage) {}
 }

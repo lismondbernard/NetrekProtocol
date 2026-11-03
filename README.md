@@ -13,7 +13,8 @@ This is the protocol and networking code from [Parallax](https://silentspice.com
 
 - **Client to server:** structs for 29 `CP_*` packets (`CP_LOGIN`, `CP_OUTFIT`, `CP_SPEED`, `CP_TORP`, `CP_MESSAGE`, `CP_FEATURE` and the rest), and `ClientPacketType` and `CLIENT_PACKET_SIZES` (sizes keyed by packet type).
 - **Server to client:** structs for 23 `SP_*` packets (`SP_YOU`, `SP_PLAYER`, `SP_PLANET`, `SP_TORP`, `SP_LOGIN`, `SP_SHIP_CAP` and the rest), and `ServerPacketType` and `SERVER_PACKET_SIZES` (sizes indexed by packet type).
-- **Constants:** `NAME_LEN`, `KEYMAP_LEN` and `MSG_LEN`.
+- **Constants:** `NAME_LEN`, `KEYMAP_LEN` and `MSG_LEN`, and `MessageFlag`, the message group and flag values (MVALID, MTEAM, MDISTR and the rest).
+- **RCD distress calls:** `Distress` and `DistressType` encode and decode the binary "carrying", "help", "ogging" and other calls classic clients send to their team, byte for byte as the COW client does. `Distress.defaultText` turns a call into the line a classic client shows, with COW's default texts. Tests check all of it against bytes and lines made by COW's own code (`Tests/RCDHarness`).
 
 Each struct has public fields and initialisers, nothing more. The type byte is fixed. Each `SP_*` struct has an `init()` that zeroes every other field, so you set the fields you need. Multi-byte fields hold network byte order, so fill them with `.bigEndian` values. To send a packet, copy the struct's bytes:
 
@@ -32,6 +33,7 @@ Tests pin every struct's size and field offsets to the classic `packets.h`, and 
 - **Connection:** `TcpReader` (a TCP connection built on Network.framework) and the `NetworkDelegate` protocols.
 - **Sending:** `MakePacket` builds every client packet: login, outfit, speed, direction, torpedo, laser, plasma, shields, cloak, tractor, pressor, orbit, bomb, beam, messages and the rest.
 - **Receiving:** `PacketAnalyzer` reads the server's packet stream and updates a `Universe`. Its `PacketAnalyzerDelegate` hears about login, outfit and team eligibility.
+- **Distress calls:** `MakePacket.cpDistress` sends an RCD call to your team, and `Universe.makeDistress` fills one from your ship. `UniverseEventDelegate` gets every incoming message with its raw flags, and each RCD call as a `Distress`; `Universe.defaultText(for:)` gives its text.
 - **The universe:** `Universe` holds `Player`, `Planet`, `Torpedo`, `Laser`, `Plasma` and `ShipInfo` objects plus the message log. They are `ObservableObject`s, so SwiftUI views can watch them. `UniverseEventDelegate` tells you when your ship is destroyed, when the server is ready for a new ship, and when weapons fire near you (Parallax uses it for sound).
 - **Servers:** `MetaServer` and `MetaServerEntry` list the public servers from metaserver.netrek.org, and `LocalServerBrowser` finds `_netrek._tcp` servers over Bonjour.
 - **Re-exported:** importing NetrekProtocol also imports NetrekWire.
@@ -165,7 +167,63 @@ Part of what Parallax earns goes to the volunteers who run the public Netrek ser
 
 This code began as Darrell Root's [Netrek-SwiftUI](https://github.com/darrellroot/Netrek-SwiftUI) client, and its protocol work also fed his [netrek-server-swift](https://github.com/darrellroot/netrek-server-swift). Thank you, Darrell. Silent Spice has since reworked it for Parallax and split it out as this package.
 
+The RCD distress format and its default texts are the COW client's, by the COW (BRM) authors. See [netrek-client-cow](https://github.com/quozl/netrek-client-cow).
+
 Netrek itself is the work of many people since 1989. See [netrek.org](https://www.netrek.org).
+
+## Third-party notices
+
+The RCD distress code holds code and texts from the [COW client](https://github.com/quozl/netrek-client-cow) (commit f680bd3):
+
+- `Sources/NetrekWire/DistressMacro.swift`: COW's default RCD texts (`dist_defaults` in `data.c`), copied, and its macro expansion (`makedistress()` and its helpers in `distress.c`), ported to Swift, with its name tables from `data.c`.
+- `Sources/NetrekWire/Distress.swift`: the RCD wire format, type names and numbers and field handling of COW's `struct.h`, `distress.c` and `senddist.c`.
+- `Tests/NetrekWireTests/CowDistressGoldens.swift`, `Tests/NetrekWireTests/DistressTests.swift` and `Tests/NetrekProtocolTests/DistressPacketTests.swift`: lines expanded from COW's default texts.
+- `Tests/RCDHarness/harness.c`: a few lines following COW's `smessage.c` and `data.c`. The harness builds against COW's own code, which `make-goldens.sh` downloads; that code is not in this repository.
+
+Each of those files carries the notices below. COW's `copyright.h`:
+
+```
+/* Copyright (c) 1986   Chris Guthrie
+ * 
+ * Permission to use, copy, modify, and distribute this software and its
+ * documentation for any purpose and without fee is hereby granted, provided
+ * that the above copyright notice appear in all copies and that both that
+ * copyright notice and this permission notice appear in supporting
+ * documentation.  No representations are made about the suitability of this
+ * software for any purpose.  It is provided "as is" without express or
+ * implied warranty.
+ * 
+ * ----------------------------------------------------------- Copyright 1989
+ * Kevin P. Smith Scott Silvey
+ * 
+ * ditto.
+ * 
+ * ----------------------------------------------------------- Copyright 1993
+ * 
+ * As above.  Use at your own risk.
+ * 
+ * COW (BRM) authors (including but not limitted to: Kevin Powell Nick Trown
+ * Jeff Nelson Kurt Siegl)
+ * ----------------------------------------------------------- Copyright 1994
+ * 
+ * As above.
+ * 
+ * Hockey Lines added to COW by Nathan Doss Michael Kantner */
+```
+
+COW's `copyright2.h`:
+
+```
+/*
+   Copyright 1989               Kevin P. Smith
+   Scott Silvey
+
+   Permission to use, copy, modify, and distribute this
+   software and its documentation for any purpose and without
+   fee is hereby granted, provided that the above copyright
+   notice appear in all copies.
+ */
+```
 
 ## License
 
