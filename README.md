@@ -171,6 +171,60 @@ The RCD distress format and its default texts are the COW client's, by the COW (
 
 Netrek itself is the work of many people since 1989. See [netrek.org](https://www.netrek.org).
 
+## Third-party notices
+
+The RCD distress code holds code and texts from the [COW client](https://github.com/quozl/netrek-client-cow) (commit f680bd3):
+
+- `Sources/NetrekWire/DistressMacro.swift`: COW's default RCD texts (`dist_defaults` in `data.c`), copied, and its macro expansion (`makedistress()` and its helpers in `distress.c`), ported to Swift, with its name tables from `data.c`.
+- `Sources/NetrekWire/Distress.swift`: the RCD wire format, type names and numbers and field handling of COW's `struct.h`, `distress.c` and `senddist.c`.
+- `Tests/NetrekWireTests/CowDistressGoldens.swift`, `Tests/NetrekWireTests/DistressTests.swift` and `Tests/NetrekProtocolTests/DistressPacketTests.swift`: lines expanded from COW's default texts.
+- `Tests/RCDHarness/harness.c`: a few lines following COW's `smessage.c` and `data.c`. The harness builds against COW's own code, which `make-goldens.sh` downloads; that code is not in this repository.
+
+Each of those files carries the notices below. COW's `copyright.h`:
+
+```
+/* Copyright (c) 1986   Chris Guthrie
+ * 
+ * Permission to use, copy, modify, and distribute this software and its
+ * documentation for any purpose and without fee is hereby granted, provided
+ * that the above copyright notice appear in all copies and that both that
+ * copyright notice and this permission notice appear in supporting
+ * documentation.  No representations are made about the suitability of this
+ * software for any purpose.  It is provided "as is" without express or
+ * implied warranty.
+ * 
+ * ----------------------------------------------------------- Copyright 1989
+ * Kevin P. Smith Scott Silvey
+ * 
+ * ditto.
+ * 
+ * ----------------------------------------------------------- Copyright 1993
+ * 
+ * As above.  Use at your own risk.
+ * 
+ * COW (BRM) authors (including but not limitted to: Kevin Powell Nick Trown
+ * Jeff Nelson Kurt Siegl)
+ * ----------------------------------------------------------- Copyright 1994
+ * 
+ * As above.
+ * 
+ * Hockey Lines added to COW by Nathan Doss Michael Kantner */
+```
+
+COW's `copyright2.h`:
+
+```
+/*
+   Copyright 1989               Kevin P. Smith
+   Scott Silvey
+
+   Permission to use, copy, modify, and distribute this
+   software and its documentation for any purpose and without
+   fee is hereby granted, provided that the above copyright
+   notice appear in all copies.
+ */
+```
+
 ## License
 
 MIT. See [LICENSE](LICENSE).
