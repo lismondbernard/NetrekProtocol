@@ -13,10 +13,34 @@ public protocol NetworkDelegate {
     func gotData(data: Data, from: String, port: Int)
 }
 
+/// Why a `TcpReader` stopped reading for good.
+public enum ConnectionEnd: Equatable, Sendable {
+    /// The server closed the connection, for example after a ghostbust or
+    /// an SP_BADVERSION.
+    case serverClosed
+    /// A receive failed. The text is the system's description of the error.
+    case receiveFailed(String)
+    /// The connection itself failed (its state became `.failed`). The text
+    /// is the system's description of the error.
+    case connectionFailed(String)
+}
+
 /// Extended protocol with connection state notifications
 /// Used by managers that need to track connection lifecycle
 public protocol NetworkDelegateExtended: NetworkDelegate {
     func connectionStateChanged(connected: Bool)
+    /// The reader stopped reading, and says why. It cancels the connection
+    /// next, and does not call `connectionStateChanged(connected: false)`
+    /// for that, so this is the only report of the end. Nothing is reported
+    /// for an end that follows the client's own `resetConnection()`.
+    func connectionEnded(_ end: ConnectionEnd)
+}
+
+extension NetworkDelegateExtended {
+    /// Reports the end as a disconnect, for delegates that don't need the reason.
+    public func connectionEnded(_ end: ConnectionEnd) {
+        connectionStateChanged(connected: false)
+    }
 }
 
 /// Anything that can send packets to the game server: a `TcpReader`, or an

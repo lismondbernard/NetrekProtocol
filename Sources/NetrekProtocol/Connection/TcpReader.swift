@@ -23,7 +23,12 @@ public class TcpReader {
     let queue: DispatchQueue
     var receiving: Bool = false // primitive lock on receiving
     var receiveCount: Int = 0
-    var complete = false // set to true once we get complete in our receive closure
+    /// Reports the end of the connection once, with its reason, and not
+    /// at all after `resetConnection()`. It also holds `complete`, which
+    /// main reads and the connection's queue writes.
+    private let ends = ReaderEnds()
+    /// True once reading is over.
+    var complete: Bool { ends.isComplete }
     public init?(hostname: String, port: Int, delegate: NetworkDelegate) {
         self.hostname = hostname
         self.port = port
@@ -57,9 +62,9 @@ public class TcpReader {
                 self?.receive()
             case .failed(let error):
                 debugPrint("TcpReader.client failed with error \(error)")
-                if let extDelegate = self?.delegate as? NetworkDelegateExtended {
-                    extDelegate.connectionStateChanged(connected: false)
-                }
+                // Races the failing receive; either one gives the reason.
+                self?.handle(.failed("\(error)"))
+                self?.connection.cancel()
             case .setup:
                 debugPrint("TcpReader.setup")
             case .waiting(_):
@@ -68,15 +73,17 @@ public class TcpReader {
                 debugPrint("TcpReader.preparing")
             case .cancelled:
                 debugPrint("TcpReader.cancelled")
-                if let extDelegate = self?.delegate as? NetworkDelegateExtended {
-                    extDelegate.connectionStateChanged(connected: false)
-                }
+                self?.handle(.cancelled)
             }
         }
         
         connection.start(queue: queue)
     }
     public func resetConnection() {
+        // The receive waiting now finishes with an error, and the state
+        // becomes `.cancelled`. Both are ours, not news, so neither is
+        // reported: the caller already knows it left.
+        ends.clientClosed()
         self.connection.cancel()
     }
     public func receive() {
@@ -94,20 +101,48 @@ public class TcpReader {
             if (content?.count ?? 0) > 0 {
                 debugPrint("\(Date()) TcpReader: got a message \(String(describing: content?.count)) bytes")
             }
-            if let content = content {
+            let step = ReceiveStep.after(byteCount: content?.count ?? 0, isComplete: isComplete,
+                                         errorDescription: error.map { "\($0)" })
+            if let content = content, !content.isEmpty {
                 //debugPrint("content startIndex \(content.startIndex) endIndex \(content.endIndex)" )
                 self.delegate.gotData(data: content, from: self.hostname, port: self.port)
             }
-            /* moved to after PacketAnalyzer
-             if self.connection.state == .ready && isComplete == false {
-                    self.receive()
-            }*/
+            // After bytes, PacketAnalyzer asks for more (triggerReceive).
+            // Every other outcome is handled here, so reading never just stops.
+            switch step {
+            case .handedOn:
+                break
+            case .receiveAgain:
+                self.receive()
+            case .end(let end):
+                self.end(end)
+            }
         }
         //debugPrint("leaving receive count \(self.receiveCount)")
         receiveCount = receiveCount + 1
         //debugPrint("returning from trying to receive data")
     }
     
+    /// Reading is over: say why, once, and close our side.
+    private func end(_ end: ConnectionEnd) {
+        debugPrint("TcpReader.end: \(end)")
+        handle(.receiveEnded(end))
+        connection.cancel()
+    }
+
+    /// Tells the delegate about an end, if `ends` says to.
+    private func handle(_ event: ReaderEnds.Event) {
+        guard let report = ends.report(event) else {
+            debugPrint("TcpReader: not reported, already known: \(event)")
+            return
+        }
+        guard let extDelegate = delegate as? NetworkDelegateExtended else { return }
+        switch report {
+        case .ended(let end): extDelegate.connectionEnded(end)
+        case .disconnected: extDelegate.connectionStateChanged(connected: false)
+        }
+    }
+
     public func send(content: Data) {
         debugPrint("\(Date()) TcpReader.sending data \(content.count) bytes")
         connection.send(content: content, completion: .contentProcessed({ (error) in
