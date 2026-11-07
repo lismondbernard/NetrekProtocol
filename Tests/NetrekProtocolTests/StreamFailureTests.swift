@@ -31,7 +31,8 @@ private final class OlderAnalyzerDelegate: PacketAnalyzerDelegate {
     var gameState: GameState = .gameActive
     var serverFeatures: [String] = []
     var receiveRequests = 0
-    func newGameState(_ state: GameState) {}
+    var states: [GameState] = []
+    func newGameState(_ state: GameState) { states.append(state) }
     func triggerReceive() { receiveRequests += 1 }
     func updateTeamEligibility(mask: UInt8) {}
     func outfitRefused() {}
@@ -144,7 +145,9 @@ final class StreamFailureTests: XCTestCase {
                        "unreadable packet type 47 (variable length) at stream offset 1234, after type 4, bytes: 2f 01 ff")
     }
 
-    func testDefaultImplementation_LetsOlderDelegatesCompileAndStop() {
+    func testDefaultImplementation_LeavesTheServer() {
+        // A delegate written before packetStreamUnreadable must not freeze
+        // in silence: the default ends the session the way a client does.
         let older = OlderAnalyzerDelegate()
         let analyzer = PacketAnalyzer(delegate: older, universe: universe)
 
@@ -152,6 +155,82 @@ final class StreamFailureTests: XCTestCase {
 
         XCTAssertNotNil(analyzer.unreadable, "the analyzer still records it")
         XCTAssertEqual(older.receiveRequests, 0)
+        XCTAssertEqual(older.states, [.noServerSelected])
+    }
+
+    // MARK: - A local server: drop the batch and keep reading
+
+    func testDropBatchPolicy_DropsTheRestAndReadsTheNextBatch() {
+        analyzer.unreadablePolicy = .dropBatch
+        var bad = PacketBuilder.spPstatus(playerId: 1, status: 2)
+        bad.append(contentsOf: [200, 1, 2, 3])
+        bad.append(PacketBuilder.spPstatus(playerId: 2, status: 2))
+
+        analyzer.analyze(incomingData: bad)
+
+        XCTAssertNil(analyzer.unreadable, "the stream is still readable")
+        XCTAssertTrue(delegate.unreadable.isEmpty, "nothing to leave: the next batch starts on a packet")
+        XCTAssertEqual(analyzer.droppedBatches, 1)
+        XCTAssertEqual(analyzer.bytesRead, 4, "the packet before the bad one was read; the rest was dropped")
+        XCTAssertEqual(delegate.receiveRequests, 1, "it asks for more")
+
+        analyzer.analyze(incomingData: PacketBuilder.spPstatus(playerId: 3, status: 2))
+
+        XCTAssertEqual(analyzer.bytesRead, 8, "the next batch is read as normal")
+        XCTAssertEqual(delegate.receiveRequests, 2)
+    }
+
+    func testDropBatchPolicy_ForgetsAPartialPacket() {
+        analyzer.unreadablePolicy = .dropBatch
+        analyzer.analyze(incomingData: Data([200]))
+        analyzer.analyze(incomingData: PacketBuilder.spPstatus(playerId: 1, status: 2))
+        XCTAssertEqual(analyzer.bytesRead, 4)
+        XCTAssertEqual(analyzer.droppedBatches, 1)
+    }
+
+    func testDefaultPolicy_StopsReading() {
+        XCTAssertEqual(PacketAnalyzer(delegate: delegate, universe: universe).unreadablePolicy, .stopReading)
+    }
+
+    // MARK: - The server's last words
+
+    func testWarning_IsKeptAsTheLastServerNotice() {
+        XCTAssertNil(analyzer.lastServerNotice)
+        let before = Date()
+
+        analyzer.analyze(incomingData: Self.spWarning("Server is shutting down"))
+
+        XCTAssertEqual(analyzer.lastServerNotice?.text, "Server is shutting down")
+        XCTAssertGreaterThanOrEqual(analyzer.lastServerNotice?.receivedAt ?? .distantPast, before)
+    }
+
+    func testWarning_GoesThroughTheTextFilter() {
+        analyzer.textFilter = { $0.uppercased() }
+        analyzer.analyze(incomingData: Self.spWarning("ghostbusted"))
+        XCTAssertEqual(analyzer.lastServerNotice?.text, "GHOSTBUSTED")
+    }
+
+    func testBadVersion_ReadsWhyFromTheSecondByte() {
+        // struct badversion_spacket { char type; char why; char pad2, pad3; }
+        analyzer.analyze(incomingData: Data([21, 0, 9, 9]))
+        XCTAssertEqual(analyzer.lastServerNotice?.text, "The server does not accept this client version.")
+
+        analyzer.analyze(incomingData: Data([21, 1, 0, 0]))
+        XCTAssertEqual(analyzer.lastServerNotice?.text, "The server is not taking players now. Try again later.")
+    }
+
+    func testLaterWarning_ReplacesTheEarlierOne() {
+        analyzer.analyze(incomingData: Self.spWarning("one") + Self.spWarning("two"))
+        XCTAssertEqual(analyzer.lastServerNotice?.text, "two")
+    }
+
+    /// SP_WARNING: type 10, three pad bytes, 80 bytes of text.
+    private static func spWarning(_ text: String) -> Data {
+        var data = Data([10, 0, 0, 0])
+        var body = Data(text.utf8.prefix(79))
+        body.append(Data(repeating: 0, count: 80 - body.count))
+        data.append(body)
+        return data
     }
 
     // MARK: - Reading continues where it should

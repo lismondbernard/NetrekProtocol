@@ -21,13 +21,44 @@ public protocol PacketAnalyzerDelegate: AnyObject {
     /// The analyzer lost its place in the stream and has stopped: it will
     /// not call `triggerReceive()` again, and ignores bytes it is given
     /// from now on. End the session; the connection is no use any more.
+    /// Only sent under `UnreadablePolicy.stopReading`.
     func packetStreamUnreadable(_ packet: UnreadablePacket)
 }
 
 extension PacketAnalyzerDelegate {
-    /// Does nothing more than the analyzer's own debugPrint, as before
-    /// this was reported. Implement it to leave the server and say why.
-    public func packetStreamUnreadable(_ packet: UnreadablePacket) {}
+    /// Leaves the server, so a delegate that doesn't implement this never
+    /// freezes in silence: `newGameState(.noServerSelected)` is how the
+    /// analyzer already ends a session. Implement it to say why as well.
+    public func packetStreamUnreadable(_ packet: UnreadablePacket) {
+        newGameState(.noServerSelected)
+    }
+}
+
+/// What `PacketAnalyzer` does with a packet type it cannot size.
+public enum UnreadablePolicy: Equatable, Sendable {
+    /// Stop reading for good and tell the delegate
+    /// (`packetStreamUnreadable`). Right for a TCP stream, where every
+    /// packet's start comes from the length of the one before, so the
+    /// place is lost.
+    case stopReading
+    /// Drop the rest of this batch, log it, and read the next batch as
+    /// normal. Only for a source that hands over whole packets in each
+    /// batch, such as a server in the same process, so the next batch
+    /// starts on a packet.
+    case dropBatch
+}
+
+/// The last text the server sent about the session itself: an SP_WARNING,
+/// or why an SP_BADVERSION refused the client. A client can show it after
+/// the connection ends, when the message board is cleared.
+public struct ServerNotice: Equatable, Sendable {
+    public let text: String
+    public let receivedAt: Date
+
+    public init(text: String, receivedAt: Date) {
+        self.text = text
+        self.receivedAt = receivedAt
+    }
 }
 
 /// Parses the server-to-client (SP_*) packet stream into a `Universe`.
@@ -46,6 +77,12 @@ public class PacketAnalyzer {
     /// Set once the stream could not be read. From then on `analyze`
     /// ignores its input and no longer asks for more.
     public private(set) var unreadable: UnreadablePacket?
+    /// What to do with a packet type that cannot be sized.
+    public var unreadablePolicy: UnreadablePolicy = .stopReading
+    /// Batches dropped under `UnreadablePolicy.dropBatch`.
+    public private(set) var droppedBatches = 0
+    /// The last SP_WARNING or SP_BADVERSION, kept until the next one.
+    public private(set) var lastServerNotice: ServerNotice?
 
     let msg_len = MSG_LEN
     let name_len = 16
@@ -129,12 +166,21 @@ public class PacketAnalyzer {
                 return
             }
             if let reason = UnreadablePacket.reason(forType: packetType) {
-                // Without this packet's length there is no way to find the
-                // next one, so reading ends here, and says so.
                 let packet = UnreadablePacket(packetType: packetType, reason: reason,
                                               streamOffset: bytesRead,
                                               previousPacketType: lastPacketType,
                                               leadingBytes: [UInt8](data.prefix(UnreadablePacket.leadingByteLimit)))
+                if unreadablePolicy == .dropBatch {
+                    // The next batch starts on a packet, so read on.
+                    debugPrint("PacketAnalyzer.analyze: dropping \(data.count) bytes of this batch: \(packet)")
+                    droppedBatches += 1
+                    leftOverData = nil
+                    universe.serverUpdate.increment()
+                    delegate?.triggerReceive()
+                    return
+                }
+                // Without this packet's length there is no way to find the
+                // next one, so reading ends here, and says so.
                 debugPrint("PacketAnalyzer.analyze: \(packet)")
                 unreadable = packet
                 universe.serverUpdate.increment()
@@ -180,6 +226,15 @@ public class PacketAnalyzer {
             debugPrint(dumpString)
         }
     }
+    /// What a classic client says for an SP_BADVERSION (socket.c
+    /// handleBadVersion): 0 is the wrong client version, anything else a
+    /// refusal for now.
+    static func badVersionText(why: UInt8) -> String {
+        why == 0
+            ? "The server does not accept this client version."
+            : "The server is not taking players now. Try again later."
+    }
+
     /// A fixed-size C string field: the bytes up to the first NUL, as UTF-8,
     /// or Latin-1 when they aren't valid UTF-8 (older clients and servers).
     static func cString(_ field: Data) -> String {
@@ -325,6 +380,7 @@ public class PacketAnalyzer {
                 
                 //debugPrint("Received SP_WARNING 10 MESSAGE \(messageString) sent to messages")
 
+                lastServerNotice = ServerNotice(text: textFilter(messageString), receivedAt: Date())
                 messageString.append("\n")
                 messageString = textFilter(messageString)
                 universe.gotMessage(messageString)
@@ -341,6 +397,7 @@ public class PacketAnalyzer {
             let messageData = data.subdata(in: range)
             if let messageStringWithNulls = String(data: messageData, encoding: .utf8) {
                 var messageString = messageStringWithNulls.filter { $0 != "\0" }
+                lastServerNotice = ServerNotice(text: textFilter(messageString), receivedAt: Date())
                 messageString.append("\n")
                 messageString = textFilter(messageString)
                 universe.gotMessage(messageString)
@@ -490,8 +547,10 @@ public class PacketAnalyzer {
             //debugPrint(player)
             //printData(data, success: true)
         case 21: //SP_BADVERSION
-            let why = UInt8(data[2])
-            //debugPrint("Received SP_BADVERSION 21 reason: \(why)")
+            // struct badversion_spacket { char type; char why; char pad2, pad3; }
+            let why = UInt8(data[1])
+            debugPrint("Received SP_BADVERSION 21 reason: \(why)")
+            lastServerNotice = ServerNotice(text: Self.badVersionText(why: why), receivedAt: Date())
 
         case 22:
             let playerID = Int(data[1])

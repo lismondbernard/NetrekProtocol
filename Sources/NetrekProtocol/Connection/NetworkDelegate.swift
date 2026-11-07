@@ -20,6 +20,9 @@ public enum ConnectionEnd: Equatable, Sendable {
     case serverClosed
     /// A receive failed. The text is the system's description of the error.
     case receiveFailed(String)
+    /// The connection itself failed (its state became `.failed`). The text
+    /// is the system's description of the error.
+    case connectionFailed(String)
 }
 
 /// Extended protocol with connection state notifications
@@ -28,7 +31,8 @@ public protocol NetworkDelegateExtended: NetworkDelegate {
     func connectionStateChanged(connected: Bool)
     /// The reader stopped reading, and says why. It cancels the connection
     /// next, and does not call `connectionStateChanged(connected: false)`
-    /// for that, so this is the only report of the end.
+    /// for that, so this is the only report of the end. Nothing is reported
+    /// for an end that follows the client's own `resetConnection()`.
     func connectionEnded(_ end: ConnectionEnd)
 }
 
