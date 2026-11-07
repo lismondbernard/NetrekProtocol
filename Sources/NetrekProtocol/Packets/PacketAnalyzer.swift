@@ -18,6 +18,16 @@ public protocol PacketAnalyzerDelegate: AnyObject {
     func triggerReceive()
     func updateTeamEligibility(mask: UInt8)
     func outfitRefused()
+    /// The analyzer lost its place in the stream and has stopped: it will
+    /// not call `triggerReceive()` again, and ignores bytes it is given
+    /// from now on. End the session; the connection is no use any more.
+    func packetStreamUnreadable(_ packet: UnreadablePacket)
+}
+
+extension PacketAnalyzerDelegate {
+    /// Does nothing more than the analyzer's own debugPrint, as before
+    /// this was reported. Implement it to leave the server and say why.
+    public func packetStreamUnreadable(_ packet: UnreadablePacket) {}
 }
 
 /// Parses the server-to-client (SP_*) packet stream into a `Universe`.
@@ -28,6 +38,14 @@ public class PacketAnalyzer {
 
     public let universe: Universe
     var leftOverData: Data?
+
+    /// Bytes of the stream read so far, in whole packets.
+    public private(set) var bytesRead = 0
+    /// The type of the last whole packet read.
+    private var lastPacketType: UInt8?
+    /// Set once the stream could not be read. From then on `analyze`
+    /// ignores its input and no longer asks for more.
+    public private(set) var unreadable: UnreadablePacket?
 
     let msg_len = MSG_LEN
     let name_len = 16
@@ -75,6 +93,10 @@ public class PacketAnalyzer {
     }
 
     public func analyze(incomingData: Data) {
+        guard unreadable == nil else {
+            debugPrint("PacketAnalyzer.analyze: ignoring \(incomingData.count) bytes after an unreadable packet")
+            return
+        }
         //debugPrint("incoming data size \(incomingData.count) leftOverData.size \(String(describing: leftOverData?.count))")
         var data = Data()
         //debugPrint("one data.startIndex \(data.startIndex) data.endIndex \(data.endIndex)")
@@ -106,16 +128,20 @@ public class PacketAnalyzer {
                 delegate?.triggerReceive()
                 return
             }
-            guard let packetLength = PACKET_SIZES[safe: Int(packetType)] else {
-                debugPrint("Warning: PacketAnalyzer.analyze received invalid packet type \(packetType) dumping data")
-                printData(data, success: false)
+            if let reason = UnreadablePacket.reason(forType: packetType) {
+                // Without this packet's length there is no way to find the
+                // next one, so reading ends here, and says so.
+                let packet = UnreadablePacket(packetType: packetType, reason: reason,
+                                              streamOffset: bytesRead,
+                                              previousPacketType: lastPacketType,
+                                              leadingBytes: [UInt8](data.prefix(UnreadablePacket.leadingByteLimit)))
+                debugPrint("PacketAnalyzer.analyze: \(packet)")
+                unreadable = packet
+                universe.serverUpdate.increment()
+                delegate?.packetStreamUnreadable(packet)
                 return
             }
-            guard packetLength > 0 else {
-                debugPrint("PacketAnalyzer invalid packet length \(packetLength) type \(packetType)")
-                printData(data, success: false)
-                return
-            }
+            let packetLength = PACKET_SIZES[Int(packetType)]
             guard data.count >= packetLength else {
                 debugPrint("PacketAnalyzer.analyze: fractional packet expected length \(packetLength) remaining size \(data.count) saving for next round")
                 self.leftOverData = Data()
@@ -130,6 +156,8 @@ public class PacketAnalyzer {
             let thisPacket = data.subdata(in: range)
             self.analyzeOnePacket(data: thisPacket)
             data.removeFirst(packetLength)
+            bytesRead += packetLength
+            lastPacketType = packetType
         } while !data.isEmpty
         // now that we've analyzed our data, we can try
         // to receive more
