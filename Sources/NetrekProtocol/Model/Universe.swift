@@ -350,6 +350,12 @@ public class Universe: ObservableObject {
     
     // swiftlint:disable:next function_parameter_count - one parameter per packet field
     public func updatePlayer(playerID: Int, tournamentKills: Int, tournamentLosses: Int, overallKills: Int, overallLosses: Int, tournamentTicks: Int, tournamentPlanets: Int, tournamentArmies: Int, starbaseKills: Int, starbaseLosses: Int, practiceArmies: Int, practicePlanets: Int, maxKills: Double, sbMaxKills: Double) {
+        // The slot comes straight from SP_STATS, so a server can send any
+        // byte; without this a slot past the end of `players` crashed here.
+        guard playerID >= 0 && playerID < maxPlayers else {
+            debugPrint("Universe.updatePlayer invalid playerID \(playerID)")
+            return
+        }
         if self.players[safe: playerID] == nil {
             let newPlayer = Player(playerId: playerID)
             newPlayer.universe = self
