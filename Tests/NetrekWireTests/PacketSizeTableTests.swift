@@ -80,8 +80,48 @@ final class PacketSizeTableTests: XCTestCase {
         }
     }
 
+    /// Every server packet size in the classic server's own table
+    /// (ntserv/genspkt.c sizes[], built with RSA and LTD_STATS on a 64-bit
+    /// machine, so LONG is 4 bytes), with this package's choices where it
+    /// differs on purpose:
+    /// - 27 SP_SCAN and 33 SP_FLAGS_ALL are 0 here: no classic server sends
+    ///   SP_SCAN, and SP_FLAGS_ALL only goes to a client that asks for it.
+    ///   A 0 ends reading with a reason instead of reading a packet the
+    ///   client has no use for.
+    /// - 42 SP_S_WARNING is -1 here, as in COW: its size comes from its
+    ///   header when it carries text.
+    static let classicServerSizes: [Int] = [
+        0, 84, 4, 8, 12, 8, 12, 16, 8, 12,          // 0-9
+        84, 84, 32, 4, 28, 12, 4, 104, 8, 4,        // 10-19
+        4, 4, 4, 56, 52, 20, 28, 0, 8, 4,           // 20-29: 27 SP_SCAN
+        4, 36, 32, 0, 0, 0, 0, 0, 0, 60,            // 30-39: 33 SP_FLAGS_ALL
+        8, -1, -1, 12, 12, -1, 8, -1, -1, 20,       // 40-49
+        -1, 0, 0, 0, 0, 0, 0, -1, -1, 36,           // 50-59
+        88, 40, 324,                                // 60 SP_FEATURE, 61 SP_RANK, 62 SP_LTD
+    ]
+
+    func testServerSizesMatchTheClassicServer() {
+        XCTAssertEqual(SERVER_PACKET_SIZES.count, Self.classicServerSizes.count)
+        for (type, size) in Self.classicServerSizes.enumerated() where type < SERVER_PACKET_SIZES.count {
+            XCTAssertEqual(SERVER_PACKET_SIZES[type], size, "type \(type)")
+        }
+    }
+
+    func testNoServerPacketIsBiggerThanSpLtd() {
+        // SP_LTD (324 bytes) is the biggest classic packet; COW 3.3.4 sizes
+        // its read buffer's slack by it. Anything bigger is no real packet.
+        XCTAssertEqual(SERVER_PACKET_SIZES.max(), 324)
+        XCTAssertEqual(SERVER_PACKET_SIZES.firstIndex(of: 324), Int(ServerPacketType.ltd.rawValue))
+    }
+
+    func testRankAndLtdTypes() {
+        XCTAssertEqual(ServerPacketType.rank.rawValue, 61)
+        XCTAssertEqual(ServerPacketType.ltd.rawValue, 62)
+        XCTAssertEqual(SERVER_PACKET_SIZES[Int(ServerPacketType.rank.rawValue)], 40)
+    }
+
     func testEveryServerPacketTypeHasATableEntry() {
-        XCTAssertEqual(SERVER_PACKET_SIZES.count, 62)
+        XCTAssertEqual(SERVER_PACKET_SIZES.count, 63)
         // Types whose size is 0 on purpose today. A 0 makes PacketAnalyzer
         // stop reading the buffer instead of guessing a length.
         let zeroOnPurpose: Set<ServerPacketType> = [
