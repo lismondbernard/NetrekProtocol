@@ -104,10 +104,21 @@ final class ReadBoundaryTests: XCTestCase {
 
     private var stream: Data { ServerStream.bytes }
 
+    /// Runs what the model put on the main queue. The tests below run the
+    /// stream thousands of times, and each run queues hundreds of model
+    /// updates, so they drain as they go: a backlog of millions took longer
+    /// than the wait, and on Apple platforms an expectation fulfilled after
+    /// its wait has ended aborts the test run.
     private func drainMainQueue() {
         let expectation = XCTestExpectation(description: "main queue")
         DispatchQueue.main.async { expectation.fulfill() }
-        wait(for: [expectation], timeout: 5.0)
+        wait(for: [expectation], timeout: 30.0)
+    }
+
+    /// Nothing a test queued for the model is left for the next test.
+    override func tearDown() {
+        drainMainQueue()
+        super.tearDown()
     }
 
     /// The stream fed in one receive: the packets and model every other
@@ -150,7 +161,9 @@ final class ReadBoundaryTests: XCTestCase {
             XCTAssertTrue(run.delegate.unreadable.isEmpty, "cut at \(cut)")
             XCTAssertEqual(run.delegate.receiveRequests, 2, "each receive asks for the next, cut at \(cut)")
             XCTAssertEqual(run.delegate.states, whole.delegate.states, "cut at \(cut)")
+            if cut % 50 == 0 { drainMainQueue() }
         }
+        drainMainQueue()
     }
 
     func testStream_CutAtEveryByte_GivesTheSameModel() {
@@ -200,8 +213,8 @@ final class ReadBoundaryTests: XCTestCase {
             XCTAssertEqual(run.analyzer.packets, ServerStream.packets, "round \(round)")
             XCTAssertTrue(run.delegate.unreadable.isEmpty, "round \(round)")
             XCTAssertEqual(run.delegate.receiveRequests, chunks.count, "round \(round)")
+            drainMainQueue()
             if round % 20 == 0 {
-                drainMainQueue()
                 XCTAssertEqual(run.model, whole.model, "round \(round)")
             }
         }

@@ -20,7 +20,13 @@ final class MalformedPacketTests: XCTestCase {
     private func drainMainQueue() {
         let expectation = XCTestExpectation(description: "main queue")
         DispatchQueue.main.async { expectation.fulfill() }
-        wait(for: [expectation], timeout: 5.0)
+        wait(for: [expectation], timeout: 30.0)
+    }
+
+    /// Nothing a test queued for the model is left for the next test.
+    override func tearDown() {
+        drainMainQueue()
+        super.tearDown()
     }
 
     /// A packet the tests put after a bad one: if it is read as itself,
