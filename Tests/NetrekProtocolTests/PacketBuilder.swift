@@ -297,7 +297,9 @@ struct PacketBuilder {
                        positionX: UInt32(targetX), positionY: UInt32(targetY))
     }
 
-    /// SP_PLANET (Type 15) - Planet state, 16 bytes (per PACKET_SIZES)
+    /// SP_PLANET (Type 15) - Planet state, 12 bytes: type, pnum, owner,
+    /// info, flags (2), pad (2), armies (4). This was 16 bytes, which
+    /// would have put 4 zero bytes (an unused type) after it in a stream.
     static func spPlanet(
         planetId: UInt8,
         owner: UInt8 = 0,
@@ -305,7 +307,7 @@ struct PacketBuilder {
         flags: UInt16 = 0,
         armies: UInt32 = 10
     ) -> Data {
-        var data = Data(count: 16)
+        var data = Data(count: 12)
         data[0] = 15          // packet type
         data[1] = planetId
         data[2] = owner
@@ -330,12 +332,6 @@ struct PacketBuilder {
             data[10] = bytes[2]
             data[11] = bytes[3]
         }
-
-        // Padding bytes 12-15
-        data[12] = 0
-        data[13] = 0
-        data[14] = 0
-        data[15] = 0
 
         return data
     }
