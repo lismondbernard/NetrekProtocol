@@ -724,6 +724,12 @@ public class PacketAnalyzer {
                 delegate?.serverFeatures = existingFeatures + features
             }
 
+        case 61, 62:
+            // SP_RANK and SP_LTD: a server sends them only to a client that
+            // asks, and Parallax doesn't. Read at their classic sizes and
+            // ignored, without the default case's dump.
+            break
+
         default:
             unhandledPacketTypes.insert(packetType)
             debugPrint("Default case: Received packet type \(packetType) length \(packetLength)\n")
