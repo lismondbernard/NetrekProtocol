@@ -70,7 +70,13 @@ public enum ServerPacketType: UInt8, CaseIterable {
     case sKills = 58           // SP_S_KILLS
     case sStats = 59           // SP_S_STATS
     case feature = 60          // SP_FEATURE
-    case bitmap = 61           // SP_BITMAP
+    case rank = 61             // SP_RANK
+    case ltd = 62              // SP_LTD
+
+    /// Type 61 is SP_RANK in the classic protocol. This name came with a
+    /// 524 byte size that no classic packet has.
+    @available(*, deprecated, renamed: "rank")
+    public static let bitmap = ServerPacketType.rank
 }
 
 /// Netrek client-to-server packet type identifiers: every type that has
@@ -122,7 +128,10 @@ public enum ClientPacketType: UInt8, CaseIterable {
 }
 
 /// Size in bytes of each server-to-client (SP_*) packet, indexed by packet
-/// type. 0 means unknown or unused, -1 means variable length.
+/// type. 0 means unknown or unused, -1 means variable length. The sizes are
+/// the classic server's (ntserv/genspkt.c sizes[]) but for SP_SCAN and
+/// SP_FLAGS_ALL (0 here) and SP_S_WARNING (-1, as in COW); PacketSizeTableTests
+/// says why. A type past the end is no classic packet.
 public let SERVER_PACKET_SIZES: [Int] = [
     0,        // NULL
     84,        // SP_MESSAGE
@@ -185,7 +194,8 @@ public let SERVER_PACKET_SIZES: [Int] = [
     -1,        // SP_S_KILLS
     36,        // SP_S_STATS
     88,        // SP_FEATURE
-    524        // SP_BITMAP
+    40,        // SP_RANK, sent only to a client that asks for it
+    324,       // SP_LTD, likewise; the biggest classic packet
 ]
 
 /// Size in bytes of each client-to-server (CP_*) packet, keyed by packet

@@ -74,6 +74,10 @@ public class PacketAnalyzer {
     public private(set) var bytesRead = 0
     /// The type of the last whole packet read.
     private var lastPacketType: UInt8?
+    /// The packet types that reached the switch's default case, which logs
+    /// each one in full. A type the analyzer reads and ignores on purpose
+    /// should have a case of its own and never appear here.
+    private(set) var unhandledPacketTypes = Set<UInt8>()
     /// Set once the stream could not be read. From then on `analyze`
     /// ignores its input and no longer asks for more.
     public private(set) var unreadable: UnreadablePacket?
@@ -632,16 +636,20 @@ public class PacketAnalyzer {
                 //debugPrint("Received SPGeneric 32 version \(version) discarding)")
                 return
             }
+            // generic_32_spacket_b is packed (packets.h): type 0, version 1,
+            // repair_time 2-3, pl_orbit 4, gameup 5-6, then one byte each.
+            // pl_orbit is a signed char, -1 when not orbiting, so it is read
+            // by bit pattern: Int8(_:) traps on a byte over 127.
             let repairTime = (data.subdata(in: (2..<4)).to(type: UInt16.self).byteSwapped)
-            let pl_orbit = Int8(data[3])
-            let gameup = (data.subdata(in: (4..<6)).to(type: UInt16.self).byteSwapped)
-            let tournamentTeams = UInt8(data[6])
-            let tournamentAge = UInt8(data[7])
-            let tournamentUnits = UInt8(data[8])
-            let tournamentRemain = UInt8(data[9])
-            let tournamentRemainUnits = UInt8(data[10])
-            let starbaseRemain = UInt8(data[11]) //starbase reconstruction in minutes
-            let teamRemain = UInt8(data[12]) // team surrender time
+            let pl_orbit = Int8(bitPattern: data[4])
+            let gameup = (data.subdata(in: (5..<7)).to(type: UInt16.self).byteSwapped)
+            let tournamentTeams = UInt8(data[7])
+            let tournamentAge = UInt8(data[8])
+            let tournamentUnits = UInt8(data[9])
+            let tournamentRemain = UInt8(data[10])
+            let tournamentRemainUnits = UInt8(data[11])
+            let starbaseRemain = UInt8(data[12]) //starbase reconstruction in minutes
+            let teamRemain = UInt8(data[13]) // team surrender time
             // 18 bytes padding
             //debugPrint("Received SP_GENERIC 32 version \(version) repairTime \(repairTime) orbit \(pl_orbit)")
             // 26 bytes of unused padding
@@ -716,7 +724,14 @@ public class PacketAnalyzer {
                 delegate?.serverFeatures = existingFeatures + features
             }
 
+        case 61, 62:
+            // SP_RANK and SP_LTD: a server sends them only to a client that
+            // asks, and Parallax doesn't. Read at their classic sizes and
+            // ignored, without the default case's dump.
+            break
+
         default:
+            unhandledPacketTypes.insert(packetType)
             debugPrint("Default case: Received packet type \(packetType) length \(packetLength)\n")
             printData(data, success: true)
 
