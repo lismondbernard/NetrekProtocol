@@ -74,6 +74,10 @@ public class PacketAnalyzer {
     public private(set) var bytesRead = 0
     /// The type of the last whole packet read.
     private var lastPacketType: UInt8?
+    /// The packet types that reached the switch's default case, which logs
+    /// each one in full. A type the analyzer reads and ignores on purpose
+    /// should have a case of its own and never appear here.
+    private(set) var unhandledPacketTypes = Set<UInt8>()
     /// Set once the stream could not be read. From then on `analyze`
     /// ignores its input and no longer asks for more.
     public private(set) var unreadable: UnreadablePacket?
@@ -721,6 +725,7 @@ public class PacketAnalyzer {
             }
 
         default:
+            unhandledPacketTypes.insert(packetType)
             debugPrint("Default case: Received packet type \(packetType) length \(packetLength)\n")
             printData(data, success: true)
 

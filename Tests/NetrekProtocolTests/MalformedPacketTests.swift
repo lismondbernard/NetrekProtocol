@@ -179,6 +179,23 @@ final class MalformedPacketTests: XCTestCase {
         XCTAssertTrue(run.delegate.unreadable.isEmpty)
     }
 
+    func testRankAndLtd_AreIgnoredWithoutTheDefaultCaseDump() {
+        // Both are read and ignored on purpose, so they get a case of their
+        // own. The default case dumps every byte of the packet to the log,
+        // in release builds too (debugPrint), and calls it unhandled.
+        let rank = WirePacket(type: 61, size: 40).data
+        let ltd = WirePacket(type: 62, size: 324).data
+        let reserved = WirePacket(type: 25, size: 20).data  // SP_RESERVED, has no case
+
+        let run = StreamRun()
+        run.feed([rank + ltd + reserved + marker])
+
+        XCTAssertEqual(run.analyzer.packets, [rank, ltd, reserved, marker])
+        XCTAssertFalse(run.analyzer.unhandledPacketTypes.contains(61), "SP_RANK")
+        XCTAssertFalse(run.analyzer.unhandledPacketTypes.contains(62), "SP_LTD")
+        XCTAssertTrue(run.analyzer.unhandledPacketTypes.contains(25), "the default case is still recorded")
+    }
+
     func testTheBiggestPacket_BoundsWhatIsHeldBetweenReceives() {
         XCTAssertEqual(PACKET_SIZES.max(), 324, "SP_LTD")
         let ltd = WirePacket(type: 62, size: 324).data
