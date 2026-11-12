@@ -181,8 +181,8 @@ final class MalformedPacketTests: XCTestCase {
 
     func testRankAndLtd_AreIgnoredWithoutTheDefaultCaseDump() {
         // Both are read and ignored on purpose, so they get a case of their
-        // own. The default case dumps every byte of the packet to the log,
-        // in release builds too (debugPrint), and calls it unhandled.
+        // own. The default case is for types the analyzer doesn't expect,
+        // and records them as unhandled.
         let rank = WirePacket(type: 61, size: 40).data
         let ltd = WirePacket(type: 62, size: 324).data
         let reserved = WirePacket(type: 25, size: 20).data  // SP_RESERVED
