@@ -75,9 +75,14 @@ public class PacketAnalyzer {
     /// The type of the last whole packet read.
     private var lastPacketType: UInt8?
     /// The packet types that reached the switch's default case, which logs
-    /// each one in full. A type the analyzer reads and ignores on purpose
+    /// each type once. A type the analyzer reads and ignores on purpose
     /// should have a case of its own and never appear here.
     private(set) var unhandledPacketTypes = Set<UInt8>()
+    /// Whether `printData` writes a packet's bytes to the log. Off, as
+    /// `debugPrint` logs in release builds too; turn it on to debug.
+    var dumpsPackets = false
+    /// Where the analyzer's packet-level log lines go.
+    var log: (String) -> Void = { debugPrint($0) }
     /// Set once the stream could not be read. From then on `analyze`
     /// ignores its input and no longer asks for more.
     public private(set) var unreadable: UnreadablePacket?
@@ -219,16 +224,24 @@ public class PacketAnalyzer {
         delegate?.triggerReceive()
     }
 
+    /// Logs a packet's bytes in hex, only when `dumpsPackets` is on.
     func printData(_ data: Data, success: Bool) {
-        let printPacketDumps = true
-            if printPacketDumps {
-            var dumpString = "\(success) "
-            for byte in data {
-                let addString = String(format:"%x ",byte)
-                dumpString += addString
-            }
-            debugPrint(dumpString)
+        guard dumpsPackets else { return }
+        var dumpString = "\(success) "
+        for byte in data {
+            let addString = String(format:"%x ",byte)
+            dumpString += addString
         }
+        log(dumpString)
+    }
+
+    /// A packet with a size but no case: noted, and logged the first time
+    /// its type is seen.
+    func unexpectedPacket(_ data: Data) {
+        guard let packetType = data.first else { return }
+        guard unhandledPacketTypes.insert(packetType).inserted else { return }
+        log("PacketAnalyzer: ignoring packet type \(packetType), which it has no case for (length \(data.count)); later ones are not logged")
+        printData(data, success: true)
     }
     /// What a classic client says for an SP_BADVERSION (socket.c
     /// handleBadVersion): 0 is the wrong client version, anything else a
@@ -255,17 +268,17 @@ public class PacketAnalyzer {
         let packetType: UInt8 = data[0]
         //debugPrint("in analyze one packet packetType \(packetType)")
         guard let packetLength = PACKET_SIZES[safe: Int(packetType)] else {
-            debugPrint("Warning: PacketAnalyzer.analyzeOnePacket received invalid packet type \(packetType)")
+            log("Warning: PacketAnalyzer.analyzeOnePacket received invalid packet type \(packetType)")
             printData(data, success: false)
             return
         }
         guard packetLength > 0 else {
-            debugPrint("PacketAnalyzer.analyzeOnePacket invalid packet length \(packetLength) type \(packetType)")
+            log("PacketAnalyzer.analyzeOnePacket invalid packet length \(packetLength) type \(packetType)")
             printData(data, success: false)
             return
         }
         guard packetLength == data.count else {
-            debugPrint("PacketAnalyzer.analyeOnePacket unexpected data length \(data.count) expected \(packetLength) type \(packetType)")
+            log("PacketAnalyzer.analyzeOnePacket unexpected data length \(data.count) expected \(packetLength) type \(packetType)")
             printData(data, success: false)
             return
         }
@@ -608,9 +621,11 @@ public class PacketAnalyzer {
             let monitor = Self.cString(data.subdata(in: (20..<36)))
             let login = Self.cString(data.subdata(in: (36..<52)))
             universe.updatePlayer(playerId: playerID, rank: rank, name: name, login: login, monitor: monitor)
-        /*case 25:
-            // is reserved, but I got one on pickled.netrek.org
-            break*/
+        case 25:
+            // SP_RESERVED: the server's check that the client is a known
+            // one, answered with CP_RESERVED. This package doesn't answer
+            // it, so it is read at its classic size and ignored.
+            break
         case 26:
             // SP_PLANET_LOC
             let planetID = Int(data[1])
@@ -724,16 +739,32 @@ public class PacketAnalyzer {
                 delegate?.serverFeatures = existingFeatures + features
             }
 
+        case 28, 29, 30:
+            // SP_UDP_REPLY, SP_SEQUENCE and SP_SC_SEQUENCE belong to the UDP
+            // link, which a client asks for with CP_UDP_REQ. This package
+            // reads over TCP only, so they are read and ignored.
+            break
+
+        case 31:
+            // SP_RSA_KEY: the server's RSA challenge, answered with
+            // CP_RSA_KEY. This package has no RSA key, so it is ignored.
+            break
+
+        case 40, 43, 44, 46, 49, 59:
+            // SP_S_REPLY, SP_S_YOU, SP_S_YOU_SS, SP_PING, SP_S_8_TORP and
+            // SP_S_STATS: short packets and pings, which a server sends only
+            // to a client that asks (CP_S_REQ, CP_PING_RESPONSE), and this
+            // package doesn't. Read at their classic sizes and ignored.
+            break
+
         case 61, 62:
             // SP_RANK and SP_LTD: a server sends them only to a client that
             // asks, and Parallax doesn't. Read at their classic sizes and
-            // ignored, without the default case's dump.
+            // ignored, so they never reach the default case.
             break
 
         default:
-            unhandledPacketTypes.insert(packetType)
-            debugPrint("Default case: Received packet type \(packetType) length \(packetLength)\n")
-            printData(data, success: true)
+            unexpectedPacket(data)
 
         }
     }

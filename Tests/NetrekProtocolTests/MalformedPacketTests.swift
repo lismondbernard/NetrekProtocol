@@ -181,11 +181,11 @@ final class MalformedPacketTests: XCTestCase {
 
     func testRankAndLtd_AreIgnoredWithoutTheDefaultCaseDump() {
         // Both are read and ignored on purpose, so they get a case of their
-        // own. The default case dumps every byte of the packet to the log,
-        // in release builds too (debugPrint), and calls it unhandled.
+        // own. The default case is for types the analyzer doesn't expect,
+        // and records them as unhandled.
         let rank = WirePacket(type: 61, size: 40).data
         let ltd = WirePacket(type: 62, size: 324).data
-        let reserved = WirePacket(type: 25, size: 20).data  // SP_RESERVED, has no case
+        let reserved = WirePacket(type: 25, size: 20).data  // SP_RESERVED
 
         let run = StreamRun()
         run.feed([rank + ltd + reserved + marker])
@@ -193,7 +193,80 @@ final class MalformedPacketTests: XCTestCase {
         XCTAssertEqual(run.analyzer.packets, [rank, ltd, reserved, marker])
         XCTAssertFalse(run.analyzer.unhandledPacketTypes.contains(61), "SP_RANK")
         XCTAssertFalse(run.analyzer.unhandledPacketTypes.contains(62), "SP_LTD")
-        XCTAssertTrue(run.analyzer.unhandledPacketTypes.contains(25), "the default case is still recorded")
+        XCTAssertFalse(run.analyzer.unhandledPacketTypes.contains(25), "SP_RESERVED")
+    }
+
+    // MARK: - The default case
+
+    func testEveryClassicTypeWithASize_HasACaseOfItsOwn() {
+        // SP_RESERVED, the UDP and RSA packets, SP_PING and the fixed size
+        // short packets are read and ignored in cases of their own, so the
+        // default case is left for types the size table doesn't know yet.
+        let run = StreamRun()
+        for type in 0..<PACKET_SIZES.count where PACKET_SIZES[type] > 0 {
+            run.feed([WirePacket(type: UInt8(type), size: PACKET_SIZES[type]).data + marker])
+        }
+        XCTAssertEqual(run.analyzer.unhandledPacketTypes, [])
+        XCTAssertTrue(run.delegate.unreadable.isEmpty)
+    }
+
+    func testTheNewlyIgnoredTypes_LeaveTheModelAlone() {
+        let ignored: [(type: UInt8, size: Int)] = [
+            (25, 20), (28, 8), (29, 4), (30, 4), (31, 36),
+            (40, 8), (43, 12), (44, 12), (46, 8), (49, 20), (59, 36),
+        ]
+        for packet in ignored {
+            XCTAssertEqual(PACKET_SIZES[Int(packet.type)], packet.size, "type \(packet.type)")
+            let before = StreamRun()
+            before.feed([marker])
+            let run = StreamRun()
+            // Every byte set, so a case that read any field would show it.
+            var bytes = [UInt8](repeating: 0xff, count: packet.size)
+            bytes[0] = packet.type
+            run.feed([Data(bytes) + marker])
+            drainMainQueue()
+            XCTAssertEqual(run.model, before.model, "type \(packet.type)")
+            XCTAssertEqual(run.analyzer.unhandledPacketTypes, [], "type \(packet.type)")
+        }
+    }
+
+    func testAnUnexpectedType_IsLoggedOnce_WithoutItsBytes() {
+        let run = StreamRun()
+        var lines: [String] = []
+        run.analyzer.log = { lines.append($0) }
+        let packet = Data([70, 0xab, 0xcd, 0xef])
+
+        run.analyzer.unexpectedPacket(packet)
+        run.analyzer.unexpectedPacket(packet)
+        run.analyzer.unexpectedPacket(Data([71, 0xab, 0xcd, 0xef]))
+
+        XCTAssertEqual(run.analyzer.unhandledPacketTypes, [70, 71])
+        XCTAssertEqual(lines.count, 2, "one line per type, not per packet: \(lines)")
+        XCTAssertFalse(lines.joined().contains("ab cd"), "no byte dump: \(lines)")
+    }
+
+    func testPrintData_DumpsNothingUnlessAskedTo() {
+        let run = StreamRun()
+        var lines: [String] = []
+        run.analyzer.log = { lines.append($0) }
+
+        run.analyzer.printData(Data([1, 0xab, 0xcd]), success: false)
+        XCTAssertEqual(lines, [], "off by default")
+        XCTAssertFalse(run.analyzer.dumpsPackets)
+
+        run.analyzer.dumpsPackets = true
+        run.analyzer.printData(Data([1, 0xab, 0xcd]), success: false)
+        XCTAssertEqual(lines, ["false 1 ab cd "])
+    }
+
+    func testAMalformedMessage_LogsWithoutADump() {
+        // The error paths call printData too; with dumps off they log their
+        // one line and no bytes.
+        let run = StreamRun()
+        var lines: [String] = []
+        run.analyzer.log = { lines.append($0) }
+        run.analyzer.analyzeOnePacket(data: Data([1, 2, 3]))  // SP_MESSAGE is 84 bytes
+        XCTAssertEqual(lines.count, 1, "\(lines)")
     }
 
     func testTheBiggestPacket_BoundsWhatIsHeldBetweenReceives() {
