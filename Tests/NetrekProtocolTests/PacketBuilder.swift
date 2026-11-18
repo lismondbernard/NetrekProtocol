@@ -379,6 +379,17 @@ struct PacketBuilder {
         return data
     }
 
+    /// SP_LOGIN (Type 17) - login response, 104 bytes. Vanilla servers leave
+    /// the two pad bytes after `accept` uninitialised, so tests choose them.
+    static func spLogin(accept: UInt8, pad2: UInt8 = 0, pad3: UInt8 = 0) -> Data {
+        var data = Data(count: 104)
+        data[0] = 17
+        data[1] = accept
+        data[2] = pad2
+        data[3] = pad3
+        return data
+    }
+
     /// Creates a login sequence of packets
     static func loginSequence(playerId: UInt8) -> Data {
         var data = Data()
