@@ -504,15 +504,11 @@ public class PacketAnalyzer {
         case 17:
             // SP_LOGIN
             let accept = Int(data[1])
-            let paradise1 = Int(data[2])
-            let paradise2 = Int(data[3])
+            // data[2] and data[3] are pad bytes. Vanilla servers leave them
+            // uninitialised, so they say nothing about the server type.
             let flags = data.subdata(in: (4..<8)).to(type: UInt32.self).byteSwapped
             let keymap = data.subdata(in: (8..<96))
             
-            if paradise1 == 69 && paradise2 == 42 {
-                debugPrint("paradise server not supported")
-                delegate?.newGameState(.noServerSelected)
-            }
             if accept == 0 {   // login failed
                 debugPrint("login failed")
                 delegate?.newGameState(.noServerSelected)

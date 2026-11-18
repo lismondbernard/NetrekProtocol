@@ -74,6 +74,22 @@ final class PacketAnalyzerTests: XCTestCase {
         XCTAssertEqual(delegate.outfitRefusals, 1)
     }
 
+    func testSpLogin_AcceptedWhateverTheUnsetPadBytesHold() {
+        // Vanilla servers 2.17 and 2.20 never set these two bytes, so any
+        // pair can arrive, including 69 and 42.
+        for (pad2, pad3) in [(0, 0), (133, 8), (78, 79), (69, 42)] as [(UInt8, UInt8)] {
+            let delegate = RecordingAnalyzerDelegate()
+            let analyzer = PacketAnalyzer(delegate: delegate, universe: Universe())
+            analyzer.analyze(incomingData: PacketBuilder.spLogin(accept: 1, pad2: pad2, pad3: pad3))
+            XCTAssertEqual(delegate.states, [.loginAccepted], "pad bytes \(pad2),\(pad3)")
+        }
+    }
+
+    func testSpLogin_RefusedReportsNoServerOnce() {
+        analyzer.analyze(incomingData: PacketBuilder.spLogin(accept: 0, pad2: 69, pad3: 42))
+        XCTAssertEqual(delegate.states, [.noServerSelected])
+    }
+
     func testSpPlayer_MovesThePlayerInGameCoordinates() {
         analyzer.analyze(incomingData: PacketBuilder.spPlayer(playerId: 3, speed: 6, positionX: 25000, positionY: 75000))
         drainMainQueue()
